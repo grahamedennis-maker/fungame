@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Deepcrag — a Terraria-like</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+  <div id="ui">
+    <div id="hud-top">
+      <div id="hpbar"><div id="hpfill"></div></div>
+      <div id="hptext"></div>
+      <div id="depth"></div>
+      <div id="daynight"></div>
+    </div>
+    <div id="bosshud"><div id="bossname">The Storm King</div><div id="bosshpbar"><div id="bosshpfill"></div></div></div>
+    <div id="msglog"></div>
+    <div id="mining"><div id="miningfill"></div></div>
+    <div id="hotbar"></div>
+    <div id="inv">
+      <h2>Backpack &amp; Crafting</h2>
+      <div style="font-size:12px;color:#aa9;margin-bottom:8px;">Click a backpack item to swap it into your selected hotbar slot (shown highlighted below and in the hotbar).</div>
+      <div class="cols">
+        <div id="invgrid"></div>
+        <div id="reciperoot"></div>
+      </div>
+      <div id="closehint">Press <span class="kbd">E</span> to close</div>
+    </div>
+    <div id="deathmsg">You were slain in the depths...<br><span style="font-size:16px;">Respawning at the surface</span></div>
+  </div>
+  <div id="titlecard">
+    <h1>⛏ DEEPCRAG ⛏</h1>
+    <p>A vast world of dirt, stone and rare ore lies beneath you. Dig deep, build a base, craft better tools, and find the sunken dungeon far below — home to a restless boss who guards the storm itself.</p>
+    <p style="margin-top:10px;font-size:13px;color:#998;">
+      <span class="kbd">A/D</span> move &nbsp; <span class="kbd">Space</span> jump &nbsp;
+      <span class="kbd">Click</span> mine/attack &nbsp; <span class="kbd">Right-click</span> place &nbsp;
+      <span class="kbd">1-8</span> hotbar &nbsp; <span class="kbd">E</span> inventory/craft
+    </p>
+    <div id="titlebtns">
+      <button id="startbtn">Descend</button>
+      <button id="continuebtn">Continue</button>
+    </div>
+  </div>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

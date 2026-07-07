@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Deepcrag — a Terraria-like</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IM+Fell+English+SC&display=swap');
+  :root{
+    --ink:#0c0a12; --panel:#1b1626ee; --panel2:#241b33ee; --gold:#e8c05a;
+    --torch:#ff9a3c; --glow:#7ad9ff; --hp:#e05353; --stone:#7d7d7d;
+  }
+  *{box-sizing:border-box; -webkit-user-select:none; user-select:none;}
+  html,body{margin:0;padding:0;background:#000;overflow:hidden;height:100%;font-family:'IM Fell English SC', serif;}
+  #wrap{position:relative;width:100vw;height:100vh;background:#000;}
+  canvas{position:absolute;top:0;left:0;display:block;image-rendering:pixelated;}
+  #ui{position:absolute;inset:0;pointer-events:none;font-family:'IM Fell English SC', serif;color:#f2e8d5;}
+  .pixel{font-family:'Press Start 2P', monospace;}
+
+  #hud-top{position:absolute;top:10px;left:10px;pointer-events:none;}
+  #hpbar{width:220px;height:20px;background:#2a1414;border:2px solid #000;border-radius:3px;box-shadow:0 0 0 1px #5c3d3d inset;}
+  #hpfill{height:100%;background:linear-gradient(#f16a6a,var(--hp));width:100%;border-radius:1px;transition:width .2s;}
+  #hptext{position:absolute;top:1px;left:0;width:220px;text-align:center;font-size:12px;color:#fff;text-shadow:1px 1px 0 #000;}
+  #depth{margin-top:6px;font-size:14px;color:#cbb; text-shadow:1px 1px 0 #000;}
+  #daynight{margin-top:4px;font-size:13px;color:#ecd; text-shadow:1px 1px 0 #000;}
+
+  #bosshud{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:420px;display:none;pointer-events:none;text-align:center;}
+  #bossname{font-size:16px;color:#d8b0ff;text-shadow:1px 1px 0 #000;letter-spacing:2px;}
+  #bosshpbar{width:100%;height:16px;background:#1a0f24;border:2px solid #000;margin-top:3px;border-radius:2px;}
+  #bosshpfill{height:100%;background:linear-gradient(#c98cff,#6b3fb0);width:100%;}
+
+  #hotbar{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:5px;pointer-events:auto;}
+  .slot{width:52px;height:52px;background:var(--panel);border:2px solid #4a3d5c;border-radius:6px;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .slot.sel{border-color:var(--gold);box-shadow:0 0 8px var(--gold);}
+  .slot .icon{width:30px;height:30px;border-radius:4px;box-shadow:0 0 0 1px #0006 inset;}
+  .slot .count{position:absolute;bottom:2px;right:4px;font-size:11px;color:#fff;text-shadow:1px 1px 0 #000;}
+  .slot .key{position:absolute;top:1px;left:3px;font-size:9px;color:#a99;}
+
+  #msglog{position:absolute;top:70px;left:10px;pointer-events:none;font-size:13px;color:#e8dcc0;}
+  #msglog div{background:#0008;padding:3px 8px;margin-bottom:3px;border-radius:3px;width:fit-content;text-shadow:1px 1px 0 #000;animation:fadeout 4s forwards;}
+  @keyframes fadeout{0%{opacity:1}70%{opacity:1}100%{opacity:0}}
+
+  #inv{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:none;pointer-events:auto;
+       background:var(--panel);border:3px solid #4a3d5c;border-radius:10px;padding:16px;width:640px;max-height:80vh;overflow:auto;box-shadow:0 10px 40px #000a;}
+  #inv h2{margin:0 0 8px 0;color:var(--gold);font-size:20px;text-shadow:1px 1px 0 #000;letter-spacing:2px;}
+  #inv .cols{display:flex;gap:16px;}
+  #invgrid{display:grid;grid-template-columns:repeat(6,52px);gap:6px;}
+  #reciperoot{flex:1;min-width:260px;}
+  .recipe{display:flex;align-items:center;gap:8px;background:#00000033;padding:6px 8px;border-radius:6px;margin-bottom:5px;cursor:pointer;border:1px solid #4a3d5c66;}
+  .recipe:hover{background:#ffffff11;}
+  .recipe.locked{opacity:.35;cursor:not-allowed;}
+  .recipe .icon{width:26px;height:26px;border-radius:4px;flex-shrink:0;}
+  .recipe .info{font-size:13px;flex:1;}
+  .recipe .req{font-size:11px;color:#bba;}
+  .stationtag{font-size:11px;color:var(--torch);margin:8px 0 4px;text-transform:uppercase;letter-spacing:1px;}
+  #closehint{font-size:12px;color:#998;margin-top:10px;}
+
+  #mining{position:absolute;width:26px;height:5px;background:#000a;border-radius:3px;overflow:hidden;display:none;}
+  #miningfill{height:100%;background:var(--gold);width:0%;}
+
+  #deathmsg{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);font-size:26px;color:#f16a6a;text-shadow:2px 2px 0 #000;display:none;text-align:center;}
+  #titlecard{position:absolute;inset:0;background:#0c0a12;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#f2e8d5;z-index:10;pointer-events:auto;}
+  #titlecard h1{font-size:38px;color:var(--gold);text-shadow:3px 3px 0 #000;letter-spacing:3px;margin-bottom:6px;}
+  #titlecard p{max-width:520px;text-align:center;line-height:1.6;color:#cbbfa0;font-size:15px;}
+  #startbtn{margin-top:22px;padding:14px 40px;font-size:18px;background:var(--gold);color:#2a1e0a;border:none;border-radius:8px;cursor:pointer;font-weight:bold;letter-spacing:1px;box-shadow:0 4px 0 #a37f2a;}
+  #startbtn:active{transform:translateY(3px);box-shadow:none;}
+  .kbd{background:#000a;padding:1px 6px;border-radius:3px;color:var(--gold);}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+  <div id="ui">
+    <div id="hud-top">
+      <div id="hpbar"><div id="hpfill"></div></div>
+      <div id="hptext"></div>
+      <div id="depth"></div>
+      <div id="daynight"></div>
+    </div>
+    <div id="bosshud"><div id="bossname">The Storm King</div><div id="bosshpbar"><div id="bosshpfill"></div></div></div>
+    <div id="msglog"></div>
+    <div id="mining"><div id="miningfill"></div></div>
+    <div id="hotbar"></div>
+    <div id="inv">
+      <h2>Backpack &amp; Crafting</h2>
+      <div style="font-size:12px;color:#aa9;margin-bottom:8px;">Click a backpack item to swap it into your selected hotbar slot (shown highlighted below and in the hotbar).</div>
+      <div class="cols">
+        <div id="invgrid"></div>
+        <div id="reciperoot"></div>
+      </div>
+      <div id="closehint">Press <span class="kbd">E</span> to close</div>
+    </div>
+    <div id="deathmsg">You were slain in the depths...<br><span style="font-size:16px;">Respawning at the surface</span></div>
+  </div>
+  <div id="titlecard">
+    <h1>⛏ DEEPCRAG ⛏</h1>
+    <p>A vast world of dirt, stone and rare ore lies beneath you. Dig deep, build a base, craft better tools, and find the sunken dungeon far below — home to a restless boss who guards the storm itself.</p>
+    <p style="margin-top:10px;font-size:13px;color:#998;">
+      <span class="kbd">A/D</span> move &nbsp; <span class="kbd">Space</span> jump &nbsp;
+      <span class="kbd">Click</span> mine/attack &nbsp; <span class="kbd">Right-click</span> place &nbsp;
+      <span class="kbd">1-8</span> hotbar &nbsp; <span class="kbd">E</span> inventory/craft
+    </p>
+    <button id="startbtn">Descend</button>
+  </div>
+</div>
+<script>
+/* ============================================================
+   DEEPCRAG — a Terraria-like sandbox
+   Single-file canvas game: procedural world, big caves, spread
+   ore rarity, a sunken dungeon, crafting, mobs, and a boss.
+   ============================================================ */
+
+/* ---------- CONSTANTS ---------- */
+const TILE = 16;
+const WORLD_W = 220;
+const WORLD_H = 120;
+const GRAVITY = 0.55;
+const MOVE_SPEED = 2.4;
+const JUMP_VEL = -9.2;
+const REACH = 5.6;
+
+const AIR=0, DIRT=1, GRASS=2, STONE=3, WOODT=4, LEAF=5, COAL=6, IRON=7, GOLD=8,
+      THORIUM=9, BEDROCK=10, BRICK=11, BRICKGLOW=12, CHEST=13, ALTAR=14,
+      TORCH=15, CRAFT_TABLE=16, FURNACE=17, SAND=18, DUNGFLOOR=19;
+
+const TILES = {
+  [AIR]:      { name:'Air', solid:false },
+  [DIRT]:     { name:'Dirt', color:'#6b4a2c', hardness:1, tier:0, solid:true, drop:'dirt' },
+  [GRASS]:    { name:'Grass', color:'#4f9e3f', top:'#3d7d31', hardness:1, tier:0, solid:true, drop:'dirt' },
+  [STONE]:    { name:'Stone', color:'#7d7d7d', hardness:2.2, tier:0, solid:true, drop:'stone' },
+  [WOODT]:    { name:'Wood', color:'#8a5a2b', hardness:1.2, tier:0, solid:true, drop:'wood' },
+  [LEAF]:     { name:'Leaves', color:'#2f7d32', hardness:0.4, tier:0, solid:false, drop:null },
+  [COAL]:     { name:'Coal Ore', color:'#3a3a3a', hardness:2.6, tier:0, solid:true, drop:'coal', dot:'#111' },
+  [IRON]:     { name:'Iron Ore', color:'#9c7a5c', hardness:3.2, tier:1, solid:true, drop:'iron_ore', dot:'#d8b48a' },
+  [GOLD]:     { name:'Gold Ore', color:'#8a7a3c', hardness:3.8, tier:2, solid:true, drop:'gold_ore', dot:'#ffd700' },
+  [THORIUM]:  { name:'Thorium Ore', color:'#5c3d6b', hardness:4.6, tier:3, solid:true, drop:'thorium_ore', dot:'#c471ff' },
+  [BEDROCK]:  { name:'Bedrock', color:'#1a1a1a', hardness:99999, tier:99, solid:true, drop:null },
+  [BRICK]:    { name:'Dungeon Brick', color:'#4a3350', hardness:3.4, tier:1, solid:true, drop:'brick' },
+  [BRICKGLOW]:{ name:'Runed Brick', color:'#5b3d73', hardness:3.4, tier:1, solid:true, drop:'brick', glow:'#a06bff' },
+  [CHEST]:    { name:'Chest', color:'#a9761f', hardness:0.6, tier:0, solid:true, drop:null, isChest:true },
+  [ALTAR]:    { name:'Storm Altar', color:'#2b2540', hardness:99999, tier:99, solid:true, drop:null, isAltar:true, glow:'#7a5cff' },
+  [TORCH]:    { name:'Torch', color:'#caa24a', hardness:0.2, tier:0, solid:false, drop:'torch', light:true },
+  [CRAFT_TABLE]:{ name:'Crafting Table', color:'#6e4626', hardness:1.5, tier:0, solid:true, drop:'crafting_table' },
+  [FURNACE]:  { name:'Furnace', color:'#4a4a4a', hardness:2, tier:0, solid:true, drop:'furnace', glow:'#ff7a3c' },
+  [SAND]:     { name:'Sand', color:'#d9c88a', hardness:0.8, tier:0, solid:true, drop:'dirt' },
+  [DUNGFLOOR]:{ name:'Dungeon Floor', color:'#3a2a42', hardness:2.5, tier:1, solid:true, drop:'brick' },
+};
+
+const ITEMS = {
+  dirt:        { name:'Dirt', color:'#6b4a2c', stack:99, place:DIRT },
+  stone:       { name:'Stone', color:'#7d7d7d', stack:99, place:STONE },
+  wood:        { name:'Wood', color:'#8a5a2b', stack:99, place:WOODT },
+  coal:        { name:'Coal', color:'#2b2b2b', stack:99 },
+  iron_ore:    { name:'Iron Ore', color:'#c9a27e', stack:99 },
+  gold_ore:    { name:'Gold Ore', color:'#e8cf5a', stack:99 },
+  thorium_ore: { name:'Thorium Ore', color:'#b06bff', stack:99 },
+  iron_bar:    { name:'Iron Bar', color:'#dcdcdc', stack:99 },
+  gold_bar:    { name:'Gold Bar', color:'#ffd700', stack:99 },
+  thorium_bar: { name:'Thorium Bar', color:'#c471ff', stack:99 },
+  brick:       { name:'Dungeon Brick', color:'#4a3350', stack:99, place:BRICK },
+  thunder_shard:{ name:'Thunder Shard', color:'#7ad9ff', stack:99, glow:true },
+  storm_core:  { name:'Storm Core', color:'#b06bff', stack:99, glow:true },
+  torch:       { name:'Torch', color:'#caa24a', stack:99, place:TORCH },
+  crafting_table:{ name:'Crafting Table', color:'#6e4626', stack:10, place:CRAFT_TABLE },
+  furnace:     { name:'Furnace', color:'#4a4a4a', stack:10, place:FURNACE },
+  coin:        { name:'Coin', color:'#ffd700', stack:999 },
+
+  wood_pickaxe:{ name:'Wood Pickaxe', color:'#8a5a2b', stack:1, tool:'pick', tier:0, power:1.0, dmg:4 },
+  wood_sword:  { name:'Wood Sword', color:'#c9a86a', stack:1, tool:'sword', dmg:6, range:26 },
+  stone_pickaxe:{ name:'Stone Pickaxe', color:'#8d8d8d', stack:1, tool:'pick', tier:1, power:1.6, dmg:6 },
+  stone_sword: { name:'Stone Sword', color:'#a8a8a8', stack:1, tool:'sword', dmg:9, range:27 },
+  iron_pickaxe:{ name:'Iron Pickaxe', color:'#dcdcdc', stack:1, tool:'pick', tier:2, power:2.3, dmg:8 },
+  iron_sword:  { name:'Iron Sword', color:'#eeeeee', stack:1, tool:'sword', dmg:13, range:28 },
+  gold_pickaxe:{ name:'Gold Pickaxe', color:'#ffd700', stack:1, tool:'pick', tier:3, power:3.0, dmg:10 },
+  gold_sword:  { name:'Gold Sword', color:'#ffe040', stack:1, tool:'sword', dmg:18, range:29 },
+  thorium_pickaxe:{ name:'Thorium Pickaxe', color:'#c471ff', stack:1, tool:'pick', tier:4, power:4.0, dmg:13 },
+  bow:         { name:'Storm Bow', color:'#7a5a2b', stack:1, tool:'bow', dmg:11, range:220 },
+  arrow:       { name:'Arrow', color:'#caa24a', stack:99, ammo:true },
+  thunder_hammer:{ name:"Thor's Hammer", color:'#8fe8ff', stack:1, tool:'hammer', dmg:34, range:42, glow:true, arc:true },
+};
+
+const RECIPES = [
+  { out:'wood_pickaxe', n:1, station:null, req:{wood:6} },
+  { out:'wood_sword', n:1, station:null, req:{wood:5} },
+  { out:'torch', n:4, station:null, req:{wood:1,coal:1} },
+  { out:'crafting_table', n:1, station:null, req:{wood:8} },
+  { out:'arrow', n:8, station:null, req:{wood:1,coal:1} },
+
+  { out:'stone_pickaxe', n:1, station:'table', req:{stone:5,wood:2} },
+  { out:'stone_sword', n:1, station:'table', req:{stone:4,wood:2} },
+  { out:'furnace', n:1, station:'table', req:{stone:15} },
+  { out:'bow', n:1, station:'table', req:{wood:6} },
+
+  { out:'iron_bar', n:1, station:'furnace', req:{iron_ore:2,coal:1} },
+  { out:'gold_bar', n:1, station:'furnace', req:{gold_ore:2,coal:1} },
+  { out:'thorium_bar', n:1, station:'furnace', req:{thorium_ore:2,coal:1} },
+
+  { out:'iron_pickaxe', n:1, station:'table', req:{iron_bar:5,wood:2} },
+  { out:'iron_sword', n:1, station:'table', req:{iron_bar:4,wood:2} },
+  { out:'gold_pickaxe', n:1, station:'table', req:{gold_bar:5,wood:2} },
+  { out:'gold_sword', n:1, station:'table', req:{gold_bar:4,wood:2} },
+  { out:'thorium_pickaxe', n:1, station:'table', req:{thorium_bar:5,wood:2} },
+
+  { out:'thunder_hammer', n:1, station:'table', req:{gold_bar:6,thunder_shard:3,thorium_bar:2} },
+];
+
+const MOB_TYPES = {
+  slime:    { name:'Cave Slime', w:16,h:12, hp:18, dmg:6, speed:0.7, color:'#4fd67a', drop:{coin:2}, contactCd:800 },
+  zombie:   { name:'Zombie', w:12,h:24, hp:34, dmg:10, speed:1.05, color:'#5b7a4a', drop:{coin:4}, contactCd:900 },
+  skeleton: { name:'Dungeon Skeleton', w:12,h:24, hp:30, dmg:8, speed:0.85, color:'#d8d8c0', drop:{coin:5,thunder_shard:1}, ranged:true, contactCd:1200 },
+};
+
+/* ---------- HELPERS ---------- */
+function rand(min,max){ return Math.random()*(max-min)+min; }
+function ri(min,max){ return Math.floor(rand(min,max+1)); }
+function chance(p){ return Math.random()<p; }
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+/* ---------- WORLD GENERATION ---------- */
+function generateWorld(W,H){
+  const grid = [];
+  for(let y=0;y<H;y++){ grid.push(new Uint8Array(W)); }
+  const surface = new Array(W).fill(0);
+  for(let x=0;x<W;x++){
+    const s = 34 + Math.sin(x*0.06)*4 + Math.sin(x*0.017)*7 + Math.sin(x*0.31)*1.5;
+    surface[x] = Math.round(s);
+  }
+  for(let x=0;x<W;x++){
+    const sy = surface[x];
+    for(let y=sy;y<H;y++){
+      if(y===sy) grid[y][x]=GRASS;
+      else if(y<sy+4) grid[y][x]=DIRT;
+      else grid[y][x]=STONE;
+    }
+    grid[H-1][x]=BEDROCK; grid[H-2][x]=BEDROCK;
+  }
+  // trees - fuller canopy, spaced out so they don't clump
+  let lastTreeX = -99;
+  for(let x=3;x<W-3;x++){
+    if(x-lastTreeX>3 && chance(0.16)){
+      lastTreeX = x;
+      const sy = surface[x];
+      const th = ri(4,7);
+      for(let i=1;i<=th;i++){ if(sy-i>0) grid[sy-i][x]=WOODT; }
+      const topY = sy-th;
+      const canopyR = ri(2,3);
+      for(let ly=-canopyR; ly<=canopyR-1; ly++){
+        for(let lx=-canopyR; lx<=canopyR; lx++){
+          const dist = Math.abs(lx) + Math.abs(ly*1.3);
+          if(dist<=canopyR+0.6){
+            const yy=topY+ly, xx=x+lx;
+            if(xx>=0&&xx<W&&yy>0&&yy<H && grid[yy][xx]===AIR) grid[yy][xx]=LEAF;
+          }
+        }
+      }
+      if(topY-1>0 && grid[topY-1][x]===AIR) grid[topY-1][x]=LEAF;
+    }
+  }
+
+  // No pre-carved caves: the underground is solid dirt/stone/bedrock
+  // all the way down except for ore veins and the dungeon complex.
+  // The player digs their own tunnels and caverns by mining.
+
+  function scatterOre(tileId, seeds, minY, maxY, veinMin, veinMax){
+    let placed=0, attempts=0;
+    while(placed<seeds && attempts<seeds*40){
+      attempts++;
+      const x = ri(3,W-4), y = ri(minY, Math.min(maxY,H-4));
+      if(grid[y][x]===STONE){
+        const veinSize = ri(veinMin,veinMax);
+        let fx=x, fy=y;
+        for(let v=0;v<veinSize;v++){
+          if(grid[fy] && grid[fy][fx]===STONE) grid[fy][fx]=tileId;
+          fx += ri(-1,1); fy += ri(-1,1);
+          fx = clamp(fx,2,W-3); fy = clamp(fy,minY-2,H-4);
+        }
+        placed++;
+      }
+    }
+  }
+  scatterOre(COAL, 95, 24, H-8, 3, 7);
+  scatterOre(IRON, 34, 30, H-6, 2, 5);
+  scatterOre(GOLD, 16, 55, H-6, 2, 4);
+  scatterOre(THORIUM, 7, 85, H-5, 1, 3);
+
+  const dgnX0 = W-46, dgnY0 = 60;
+  const rooms = [
+    {x:dgnX0, y:dgnY0, w:12, h:8},
+    {x:dgnX0+14, y:dgnY0+3, w:10, h:10},
+    {x:dgnX0+8, y:dgnY0+14, w:14, h:9},
+  ];
+  function carveRoom(r){
+    for(let y=r.y-1;y<=r.y+r.h;y++) for(let x=r.x-1;x<=r.x+r.w;x++){
+      if(x<1||x>=W-1||y<1||y>=H-3) continue;
+      const border = (y===r.y-1||y===r.y+r.h||x===r.x-1||x===r.x+r.w);
+      grid[y][x] = border ? BRICKGLOW : DUNGFLOOR;
+    }
+  }
+  for(const r of rooms) carveRoom(r);
+  function corridor(x1,y1,x2,y2){
+    let cx=x1, cy=y1;
+    while(cx!==x2){ grid[cy][cx]=DUNGFLOOR; grid[cy-1][cx]=DUNGFLOOR; cx += cx<x2?1:-1; }
+    while(cy!==y2){ grid[cy][cx]=DUNGFLOOR; cy += cy<y2?1:-1; }
+  }
+  corridor(dgnX0+12, dgnY0+4, dgnX0+14, dgnY0+7);
+  corridor(dgnX0+16, dgnY0+13, dgnX0+15, dgnY0+14);
+  grid[dgnY0+3][dgnX0+3] = CHEST;
+  grid[dgnY0+5][dgnX0+8] = CHEST;
+  grid[dgnY0+13][dgnX0+18] = CHEST;
+  grid[dgnY0+20][dgnX0+14] = ALTAR;
+  grid[dgnY0+20][dgnX0+13] = DUNGFLOOR;
+  grid[dgnY0+20][dgnX0+15] = DUNGFLOOR;
+
+  return { grid, surface, dungeon:{x:dgnX0,y:dgnY0,w:46,h:26} };
+}
+
+/* ---------- GAME STATE ---------- */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+function resize(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+window.addEventListener('resize', resize); resize();
+
+let world = null;
+const state = {
+  running:false,
+  time: 0,
+  dayLength: 180000, // ms full cycle
+  camX:0, camY:0,
+  player:null,
+  mobs:[],
+  projectiles:[],
+  particles:[],
+  boss:null,
+  bossDefeated:false,
+  bossCooldown:0,
+  inv:[], // {id,count}
+  hotbarSel:0,
+  invOpen:false,
+  mining:null, // {tx,ty,progress}
+  torches:[], // {x,y} world tile coords for light
+  keys:{},
+  mouse:{x:0,y:0,down:false,button:0},
+  lastAttack:0,
+  msgTimer:0,
+};
+
+function tileAt(tx,ty){
+  if(ty<0) return AIR;
+  if(tx<0||tx>=WORLD_W||ty>=WORLD_H) return BEDROCK;
+  return world.grid[ty][tx];
+}
+function setTile(tx,ty,v){
+  if(tx<0||tx>=WORLD_W||ty<0||ty>=WORLD_H) return;
+  world.grid[ty][tx]=v;
+}
+function tileDef(id){ return TILES[id] || TILES[AIR]; }
+function tileSolid(id){ return !!tileDef(id).solid; }
+
+/* ---------- INVENTORY ---------- */
+function addItem(id,count){
+  if(!id||!count) return;
+  const def = ITEMS[id];
+  for(const slot of state.inv){
+    if(slot && slot.id===id && slot.count<def.stack){
+      const add = Math.min(count, def.stack-slot.count);
+      slot.count += add; count -= add;
+      if(count<=0) return;
+    }
+  }
+  while(count>0){
+    const empty = state.inv.findIndex(s=>!s);
+    if(empty===-1){
+      let idx = state.inv.length;
+      if(idx>=40) return;
+      state.inv.push(null);
+      state.inv[idx] = { id, count: Math.min(count,def.stack) };
+      count -= state.inv[idx].count;
+    } else {
+      state.inv[empty] = { id, count: Math.min(count,def.stack) };
+      count -= state.inv[empty].count;
+    }
+  }
+}
+function countItem(id){
+  let c=0; for(const s of state.inv) if(s && s.id===id) c+=s.count; return c;
+}
+function removeItem(id,count){
+  for(let i=0;i<state.inv.length && count>0;i++){
+    const s = state.inv[i];
+    if(s && s.id===id){
+      const take = Math.min(count,s.count);
+      s.count -= take; count -= take;
+      if(s.count<=0) state.inv[i]=null;
+    }
+  }
+}
+function hotbarItem(){ return state.inv[state.hotbarSel]; }
+
+/* ---------- CRAFTING ---------- */
+function nearStation(kind){
+  const p = state.player;
+  const px = Math.floor(p.x/TILE), py = Math.floor(p.y/TILE);
+  for(let dy=-4;dy<=4;dy++) for(let dx=-6;dx<=6;dx++){
+    const t = tileAt(px+dx,py+dy);
+    if(kind==='table' && t===CRAFT_TABLE) return true;
+    if(kind==='furnace' && t===FURNACE) return true;
+  }
+  return false;
+}
+function canCraft(r){
+  if(r.station==='table' && !nearStation('table')) return false;
+  if(r.station==='furnace' && !nearStation('furnace')) return false;
+  for(const k in r.req){ if(countItem(k) < r.req[k]) return false; }
+  return true;
+}
+function doCraft(r){
+  if(!canCraft(r)) return;
+  for(const k in r.req) removeItem(k, r.req[k]);
+  addItem(r.out, r.n);
+  msg('Crafted '+ITEMS[r.out].name);
+  renderInvUI();
+}
+
+/* ---------- MESSAGES ---------- */
+function msg(text){
+  const log = document.getElementById('msglog');
+  const d = document.createElement('div');
+  d.textContent = text;
+  log.appendChild(d);
+  setTimeout(()=>d.remove(), 4000);
+  while(log.children.length>5) log.removeChild(log.firstChild);
+}
+
+/* ---------- PLAYER ---------- */
+function spawnPlayer(){
+  const sx = Math.floor(WORLD_W*0.25);
+  const sy = world.surface[sx]-3;
+  return {
+    x: sx*TILE, y: sy*TILE, w:11, h:23,
+    vx:0, vy:0, onGround:false, facing:1,
+    hp:100, maxhp:100, invuln:0, hurtCd:0,
+  };
+}
+
+function aabbSolid(px,py,pw,ph){
+  const x0 = Math.floor(px/TILE), x1 = Math.floor((px+pw)/TILE);
+  const y0 = Math.floor(py/TILE), y1 = Math.floor((py+ph)/TILE);
+  for(let ty=y0;ty<=y1;ty++) for(let tx=x0;tx<=x1;tx++){
+    if(tileSolid(tileAt(tx,ty))) return true;
+  }
+  return false;
+}
+
+function moveEntity(e, dt){
+  // horizontal
+  let nx = e.x + e.vx*dt;
+  if(!aabbSolid(nx, e.y, e.w, e.h)) e.x = nx; else e.vx = 0;
+  // vertical
+  e.vy += GRAVITY*dt;
+  e.vy = clamp(e.vy, -20, 14);
+  let ny = e.y + e.vy*dt;
+  if(!aabbSolid(e.x, ny, e.w, e.h)){ e.y = ny; e.onGround=false; }
+  else {
+    if(e.vy>0) e.onGround = true;
+    e.vy = 0;
+  }
+}
+
+function updatePlayer(dt){
+  const p = state.player;
+  let ax = 0;
+  if(state.keys['a']||state.keys['arrowleft']){ ax=-1; p.facing=-1; }
+  if(state.keys['d']||state.keys['arrowright']){ ax=1; p.facing=1; }
+  p.vx = ax*MOVE_SPEED;
+  if((state.keys[' ']||state.keys['w']||state.keys['arrowup']) && p.onGround){ p.vy = JUMP_VEL; p.onGround=false; }
+  moveEntity(p, dt);
+  p.x = clamp(p.x, 0, WORLD_W*TILE-p.w);
+  if(p.y>WORLD_H*TILE+200){ killPlayer(); }
+  if(p.hurtCd>0) p.hurtCd -= dt*16.7;
+  if(p.invuln>0) p.invuln -= dt*16.7;
+  if(p.hp<p.maxhp && p.hurtCd<=0) p.hp = Math.min(p.maxhp, p.hp + 0.01*dt);
+}
+
+function killPlayer(){
+  const p = state.player;
+  document.getElementById('deathmsg').style.display='block';
+  setTimeout(()=>{ document.getElementById('deathmsg').style.display='none'; },1800);
+  const sx = Math.floor(WORLD_W*0.25);
+  p.x = sx*TILE; p.y = (world.surface[sx]-3)*TILE;
+  p.vx=0; p.vy=0; p.hp = p.maxhp; p.invuln=1500;
+}
+
+function damagePlayer(amount){
+  const p = state.player;
+  if(p.invuln>0) return;
+  p.hp -= amount; p.hurtCd = 1200; p.invuln = 500;
+  if(p.hp<=0) killPlayer();
+}
+
+/* ---------- MOBS ---------- */
+function spawnMob(type, x, y){
+  const def = MOB_TYPES[type];
+  state.mobs.push({ type, x, y, w:def.w, h:def.h, vx:0, vy:0, hp:def.hp, maxhp:def.hp,
+    onGround:false, contactTimer:0, shootTimer:ri(500,1500), facing:1 });
+}
+
+function isNight(){
+  const f = (state.time % state.dayLength)/state.dayLength;
+  return f>0.5;
+}
+function dayFrac(){ return (state.time % state.dayLength)/state.dayLength; }
+
+function inDungeonArea(tx,ty){
+  const d = world.dungeon;
+  return tx>=d.x-4 && tx<=d.x+d.w+4 && ty>=d.y-2 && ty<=d.y+d.h+2;
+}
+
+let spawnTimer = 0;
+function updateSpawning(dt){
+  spawnTimer -= dt*16.7;
+  if(spawnTimer>0) return;
+  spawnTimer = ri(2200,4200);
+  if(state.mobs.length>18) return;
+  const p = state.player;
+  const ptx = Math.floor(p.x/TILE), pty = Math.floor(p.y/TILE);
+  const openSky = !tileSolid(tileAt(ptx,pty-1)) && pty < world.surface[clamp(ptx,0,WORLD_W-1)]+2;
+
+  if(inDungeonArea(ptx,pty) && chance(0.8)){
+    const ox = clamp(ptx + ri(-10,10), 2, WORLD_W-3);
+    const oy = clamp(pty + ri(-3,3), 2, WORLD_H-6);
+    if(!tileSolid(tileAt(ox,oy))) spawnMob('skeleton', ox*TILE, oy*TILE);
+    return;
+  }
+  if(openSky && isNight() && chance(0.85)){
+    const dir = chance(0.5)?-1:1;
+    const ox = clamp(ptx + dir*ri(10,16), 1, WORLD_W-2);
+    let oy = world.surface[clamp(ox,0,WORLD_W-1)]-2;
+    spawnMob('zombie', ox*TILE, oy*TILE);
+    return;
+  }
+  if(!openSky && chance(0.7)){
+    for(let tries=0;tries<10;tries++){
+      const ox = clamp(ptx + ri(-14,14), 2, WORLD_W-3);
+      const oy = clamp(pty + ri(-8,8), 25, WORLD_H-6);
+      if(!tileSolid(tileAt(ox,oy)) && !tileSolid(tileAt(ox,oy+1))){
+        spawnMob('slime', ox*TILE, oy*TILE); break;
+      }
+    }
+  }
+}
+
+function updateMobs(dt){
+  const p = state.player;
+  for(let i=state.mobs.length-1;i>=0;i--){
+    const m = state.mobs[i];
+    const def = MOB_TYPES[m.type];
+    const dx = (p.x - m.x);
+    const dist = Math.abs(dx);
+    m.facing = dx>0?1:-1;
+    if(dist < 260){
+      m.vx = m.facing*def.speed*TILE/16;
+      if(def.ranged && dist<200){ m.vx *= 0.3; }
+    } else m.vx *= 0.9;
+    if(m.type==='slime' && m.onGround && chance(0.02)) m.vy = -7;
+    moveEntity(m, dt);
+
+    if(def.ranged){
+      m.shootTimer -= dt*16.7;
+      if(m.shootTimer<=0 && dist<220 && dist>20){
+        m.shootTimer = ri(1400,2200);
+        state.projectiles.push({ x:m.x+m.w/2, y:m.y+m.h/2, vx: (dx>0?1:-1)*4.2, vy:-1.5, life:2000, from:'mob', dmg:def.dmg });
+      }
+    }
+    m.contactTimer -= dt*16.7;
+    if(dist<18 && Math.abs(p.y-m.y)<28 && m.contactTimer<=0){
+      damagePlayer(def.dmg);
+      m.contactTimer = def.contactCd;
+      p.vx += (dx>0?-1:1)*2;
+    }
+    if(m.hp<=0){
+      for(const k in def.drop) addItem(k, def.drop[k]);
+      spawnParticles(m.x+m.w/2, m.y+m.h/2, def.color, 8);
+      state.mobs.splice(i,1);
+    }
+    if(m.y>WORLD_H*TILE+400) state.mobs.splice(i,1);
+  }
+}
+
+function updateProjectiles(dt){
+  const p = state.player;
+  for(let i=state.projectiles.length-1;i>=0;i--){
+    const pr = state.projectiles[i];
+    pr.x += pr.vx*dt; pr.y += pr.vy*dt; pr.vy += 0.12*dt;
+    pr.life -= dt*16.7;
+    const tx = Math.floor(pr.x/TILE), ty = Math.floor(pr.y/TILE);
+    let hit=false;
+    if(tileSolid(tileAt(tx,ty))) hit=true;
+    if(pr.from==='mob' && Math.abs(pr.x-(p.x+p.w/2))<14 && Math.abs(pr.y-(p.y+p.h/2))<16){
+      damagePlayer(pr.dmg); hit=true;
+    }
+    if(pr.from==='player' && state.boss && state.boss.hp>0){
+      const b=state.boss;
+      if(pr.x>b.x && pr.x<b.x+b.w && pr.y>b.y && pr.y<b.y+b.h){ hitBoss(pr.dmg); hit=true; }
+    }
+    if(pr.from==='player'){
+      for(const m of state.mobs){
+        if(pr.x>m.x && pr.x<m.x+m.w && pr.y>m.y && pr.y<m.y+m.h){ m.hp-=pr.dmg; hit=true; break; }
+      }
+    }
+    if(pr.life<=0 || hit) state.projectiles.splice(i,1);
+  }
+}
+
+function spawnParticles(x,y,color,n){
+  for(let i=0;i<n;i++){
+    state.particles.push({ x,y, vx:rand(-2,2), vy:rand(-3,0), life:500, color });
+  }
+}
+function updateParticles(dt){
+  for(let i=state.particles.length-1;i>=0;i--){
+    const pt = state.particles[i];
+    pt.x+=pt.vx*dt; pt.y+=pt.vy*dt; pt.vy+=0.15*dt; pt.life-=dt*16.7;
+    if(pt.life<=0) state.particles.splice(i,1);
+  }
+}
+
+/* ---------- BOSS ---------- */
+function spawnBoss(){
+  const alt = findAltar();
+  const x = alt ? alt.x*TILE : (WORLD_W-24)*TILE;
+  const y = alt ? (alt.y-8)*TILE : 60*TILE;
+  state.boss = { x, y, w:60, h:52, hp:900, maxhp:900, vx:0, vy:0, phase:1,
+    attackTimer:1500, mode:'move', modeTimer:0, facing:1 };
+  document.getElementById('bosshud').style.display='block';
+  msg('The Storm King awakens!');
+}
+function findAltar(){
+  const d = world.dungeon;
+  for(let y=d.y;y<d.y+d.h+2;y++) for(let x=d.x-4;x<d.x+d.w+4;x++){
+    if(tileAt(x,y)===ALTAR) return {x,y};
+  }
+  return null;
+}
+function hitBoss(dmg){
+  const b = state.boss; if(!b) return;
+  b.hp -= dmg;
+  spawnParticles(b.x+b.w/2,b.y+b.h/2,'#c98cff',5);
+  if(b.hp<=0) defeatBoss();
+}
+function defeatBoss(){
+  const b = state.boss;
+  msg('The Storm King has fallen!');
+  addItem('thunder_shard', 4);
+  addItem('storm_core', 2);
+  addItem('gold_bar', 6);
+  spawnParticles(b.x+b.w/2,b.y+b.h/2,'#ffd700',30);
+  state.boss = null;
+  state.bossCooldown = 60000;
+  document.getElementById('bosshud').style.display='none';
+}
+function updateBoss(dt){
+  if(!state.boss){ if(state.bossCooldown>0) state.bossCooldown -= dt*16.7; return; }
+  const b = state.boss, p = state.player;
+  b.phase = b.hp < b.maxhp*0.35 ? 3 : (b.hp<b.maxhp*0.7 ? 2 : 1);
+  const speedMul = b.phase===3?1.8:(b.phase===2?1.3:1);
+  const dx = (p.x+p.w/2) - (b.x+b.w/2);
+  b.facing = dx>0?1:-1;
+  b.attackTimer -= dt*16.7;
+  b.modeTimer -= dt*16.7;
+
+  if(b.mode==='move'){
+    b.vx = clamp(dx*0.01,-2.6,2.6)*speedMul;
+    b.vy += Math.sin(state.time*0.002)*0.02;
+    b.y += Math.sin(state.time*0.004)*0.4;
+    if(b.attackTimer<=0){
+      b.attackTimer = b.phase===3?900:1500;
+      if(chance(0.5)){
+        b.mode='charge'; b.modeTimer=600; b.chargeVX = clamp(dx*0.04,-6,6)*speedMul;
+      } else {
+        for(let a=-1;a<=1;a++) state.projectiles.push({x:b.x+b.w/2,y:b.y+b.h/2,vx:a*3+dx*0.005,vy:2.4,life:3000,from:'mob',dmg:b.phase===3?18:12});
+      }
+    }
+  } else if(b.mode==='charge'){
+    b.vx = b.chargeVX;
+    if(b.modeTimer<=0) b.mode='move';
+  }
+  b.x += b.vx*dt;
+  b.x = clamp(b.x, 4*TILE, (WORLD_W-8)*TILE-b.w);
+  b.y = clamp(b.y, 20*TILE, (WORLD_H-20)*TILE);
+
+  if(Math.abs((b.x+b.w/2)-(p.x+p.w/2))<b.w/2+8 && Math.abs((b.y+b.h/2)-(p.y+p.h/2))<b.h/2+10){
+    damagePlayer(b.phase===3?22:16);
+  }
+  document.getElementById('bosshpfill').style.width = (100*b.hp/b.maxhp)+'%';
+}
+
+/* ---------- MINING / INTERACTION ---------- */
+function screenToWorld(sx,sy){
+  return { x: sx + state.camX, y: sy + state.camY };
+}
+function worldToTile(wx,wy){ return { tx: Math.floor(wx/TILE), ty: Math.floor(wy/TILE) }; }
+
+function reachOk(tx,ty){
+  const p = state.player;
+  const pcx = p.x+p.w/2, pcy = p.y+p.h/2;
+  const d = Math.hypot(pcx-(tx*TILE+TILE/2), pcy-(ty*TILE+TILE/2));
+  return d <= REACH*TILE;
+}
+
+function currentTool(){
+  const it = hotbarItem();
+  if(it && ITEMS[it.id] && ITEMS[it.id].tool) return ITEMS[it.id];
+  return null;
+}
+
+function tryMob(wx,wy){
+  const p = state.player;
+  const reachPx = 34 + (currentTool()&&currentTool().range?currentTool().range-24:0);
+  let best=null, bestD=9999;
+  for(const m of state.mobs){
+    const mcx=m.x+m.w/2, mcy=m.y+m.h/2;
+    const d = Math.hypot(mcx-(p.x+p.w/2), mcy-(p.y+p.h/2));
+    if(d<reachPx && d<bestD){ best=m; bestD=d; }
+  }
+  return best;
+}
+
+function doAttack(){
+  const now = performance.now();
+  const tool = currentTool();
+  const cd = tool && tool.tool==='hammer' ? 550 : 260;
+  if(now - state.lastAttack < cd) return;
+  state.lastAttack = now;
+  const dmg = tool ? (tool.dmg||5) : 3;
+
+  if(tool && tool.tool==='bow' && countItem('arrow')>0){
+    removeItem('arrow',1);
+    const p = state.player;
+    state.projectiles.push({ x:p.x+p.w/2, y:p.y+p.h/2, vx: p.facing*7, vy:-1, life:1800, from:'player', dmg });
+    return;
+  }
+  const target = tryMob();
+  if(target){ target.hp -= dmg; spawnParticles(target.x+target.w/2,target.y+target.h/2,'#fff',4); }
+  if(state.boss){
+    const b=state.boss;
+    const p=state.player;
+    const d = Math.hypot((b.x+b.w/2)-(p.x+p.w/2),(b.y+b.h/2)-(p.y+p.h/2));
+    if(d < 60) hitBoss(dmg);
+  }
+}
+
+function updateMining(dt){
+  if(!state.mining) { document.getElementById('mining').style.display='none'; return; }
+  const { tx,ty } = state.mining;
+  const t = tileAt(tx,ty);
+  const def = tileDef(t);
+  if(t===AIR || !reachOk(tx,ty)){ state.mining=null; return; }
+  const tool = currentTool();
+  const power = tool && tool.tool==='pick' ? tool.power : 0.45;
+  const tier = tool && tool.tool==='pick' ? tool.tier : -1;
+  if(def.tier>0 && tier<def.tier){
+    msg('Need a better pickaxe for '+def.name); state.mining=null; return;
+  }
+  state.mining.progress += power*dt*0.9;
+  const need = def.hardness*20;
+  document.getElementById('mining').style.display='block';
+  const sx = tx*TILE - state.camX, sy = ty*TILE - state.camY;
+  const mel = document.getElementById('mining');
+  mel.style.left = (sx-5)+'px'; mel.style.top = (sy-10)+'px';
+  document.getElementById('miningfill').style.width = clamp(100*state.mining.progress/need,0,100)+'%';
+  if(state.mining.progress>=need){
+    if(def.isChest){ openChest(tx,ty); }
+    else if(def.isAltar){ /* handled on right click */ }
+    else {
+      if(def.drop) addItem(def.drop,1);
+      if(t===COAL||t===IRON||t===GOLD||t===THORIUM) msg('Found '+def.name+'!');
+      setTile(tx,ty,AIR);
+    }
+    state.mining=null;
+  }
+}
+
+const dungeonLoot = ['thunder_shard','gold_bar','iron_bar','storm_core','arrow'];
+function openChest(tx,ty){
+  setTile(tx,ty,AIR);
+  const rolls = ri(2,3);
+  for(let i=0;i<rolls;i++){
+    const id = dungeonLoot[ri(0,dungeonLoot.length-1)];
+    const n = id==='arrow'?ri(4,10):ri(1,3);
+    addItem(id,n);
+  }
+  msg('Opened a dungeon chest!');
+}
+
+function tryAltarInteract(tx,ty){
+  if(tileAt(tx,ty)!==ALTAR) return false;
+  if(state.boss){ msg('The Storm King is already unleashed!'); return true; }
+  if(state.bossDefeated===false && state.bossCooldown>0){ msg('The altar is quiet... for now.'); return true; }
+  spawnBoss();
+  return true;
+}
+
+/* ---------- INPUT ---------- */
+window.addEventListener('keydown', e=>{
+  state.keys[e.key.toLowerCase()] = true;
+  if(e.key.toLowerCase()==='e'){ toggleInv(); }
+  const n = parseInt(e.key);
+  if(n>=1 && n<=8){ state.hotbarSel = n-1; renderHotbar(); }
+  if(e.key===' ') e.preventDefault();
+});
+window.addEventListener('keyup', e=>{ state.keys[e.key.toLowerCase()] = false; });
+
+canvas.addEventListener('contextmenu', e=>e.preventDefault());
+canvas.addEventListener('mousemove', e=>{ state.mouse.x=e.clientX; state.mouse.y=e.clientY; });
+canvas.addEventListener('mousedown', e=>{
+  state.mouse.down=true; state.mouse.button=e.button;
+  handleClick(e.clientX,e.clientY,e.button);
+});
+canvas.addEventListener('mouseup', ()=>{ state.mouse.down=false; state.mining=null; });
+
+function handleClick(sx,sy,button){
+  if(state.invOpen) return;
+  const w = screenToWorld(sx,sy);
+  const { tx,ty } = worldToTile(w.x,w.y);
+  if(!reachOk(tx,ty)) return;
+
+  if(button===0){
+    const m = tryMob();
+    const tool = currentTool();
+    if(m || state.boss){ doAttack(); return; }
+    const t = tileAt(tx,ty);
+    if(t!==AIR && t!==undefined){
+      if(tileDef(t).isAltar){ return; }
+      state.mining = { tx,ty, progress:0 };
+    } else {
+      doAttack(); // swing at air, still allow bow/attack timing
+    }
+  } else if(button===2){
+    const t = tileAt(tx,ty);
+    if(tileDef(t).isChest){ openChest(tx,ty); return; }
+    if(tileDef(t).isAltar){ tryAltarInteract(tx,ty); return; }
+    if(t===AIR){
+      const it = hotbarItem();
+      if(it && ITEMS[it.id] && ITEMS[it.id].place){
+        const p = state.player;
+        const px0=Math.floor(p.x/TILE), px1=Math.floor((p.x+p.w)/TILE);
+        const py0=Math.floor(p.y/TILE), py1=Math.floor((p.y+p.h)/TILE);
+        if(tx>=px0-0&&tx<=px1&&ty>=py0&&ty<=py1){ /* avoid placing inside player */ }
+        setTile(tx,ty, ITEMS[it.id].place);
+        removeItem(it.id,1);
+        renderHotbar();
+      }
+    }
+  }
+}
+
+document.getElementById('startbtn').addEventListener('click', startGame);
+
+/* ---------- INVENTORY UI ---------- */
+function toggleInv(){
+  state.invOpen = !state.invOpen;
+  document.getElementById('inv').style.display = state.invOpen?'block':'none';
+  if(state.invOpen) renderInvUI();
+}
+function iconEl(id){
+  const d = document.createElement('div');
+  d.className='icon';
+  const def = ITEMS[id];
+  d.style.background = def ? def.color : '#333';
+  if(def && def.glow) d.style.boxShadow = '0 0 8px '+def.color;
+  return d;
+}
+function renderHotbar(){
+  const hb = document.getElementById('hotbar');
+  hb.innerHTML='';
+  for(let i=0;i<8;i++){
+    const slot = document.createElement('div');
+    slot.className='slot'+(i===state.hotbarSel?' sel':'');
+    const key = document.createElement('div'); key.className='key'; key.textContent=(i+1);
+    slot.appendChild(key);
+    const item = state.inv[i];
+    if(item){
+      const icon = iconEl(item.id);
+      slot.appendChild(icon);
+      if(item.count>1){ const c=document.createElement('div'); c.className='count'; c.textContent=item.count; slot.appendChild(c); }
+    }
+    slot.addEventListener('click', ()=>{ state.hotbarSel=i; renderHotbar(); });
+    hb.appendChild(slot);
+  }
+}
+function renderInvUI(){
+  const grid = document.getElementById('invgrid');
+  grid.innerHTML='';
+  for(let i=0;i<40;i++){
+    const slot = document.createElement('div');
+    slot.className='slot'+(i===state.hotbarSel?' sel':'');
+    const item = state.inv[i];
+    if(item){
+      slot.appendChild(iconEl(item.id));
+      if(item.count>1){ const c=document.createElement('div'); c.className='count'; c.textContent=item.count; slot.appendChild(c); }
+      slot.title = ITEMS[item.id].name + (i>=8 ? ' (click to swap into hotbar slot '+(state.hotbarSel+1)+')' : ' (click to select)');
+    }
+    if(i<8){
+      const key = document.createElement('div'); key.className='key'; key.textContent=(i+1);
+      slot.appendChild(key);
+    }
+    // Any slot can be clicked: slots 0-7 select that hotbar slot directly;
+    // slots 8+ swap their contents into whichever hotbar slot is currently
+    // selected, so anything you craft or pick up can always reach your hands.
+    slot.addEventListener('click', ()=>{
+      if(i<8){
+        state.hotbarSel = i;
+      } else if(state.inv[i]){
+        const tmp = state.inv[state.hotbarSel];
+        state.inv[state.hotbarSel] = state.inv[i];
+        state.inv[i] = tmp;
+      }
+      renderHotbar();
+      renderInvUI();
+    });
+    grid.appendChild(slot);
+  }
+  const root = document.getElementById('reciperoot');
+  root.innerHTML='';
+  const groups = [ [null,'Hand-craft'], ['table','Crafting Table nearby'], ['furnace','Furnace nearby'] ];
+  for(const [station,label] of groups){
+    const tag = document.createElement('div'); tag.className='stationtag'; tag.textContent=label;
+    root.appendChild(tag);
+    for(const r of RECIPES.filter(r=>r.station===station)){
+      const ok = canCraft(r);
+      const row = document.createElement('div');
+      row.className='recipe'+(ok?'':' locked');
+      row.appendChild(iconEl(r.out));
+      const info = document.createElement('div'); info.className='info';
+      const reqStr = Object.entries(r.req).map(([k,v])=>`${v} ${ITEMS[k].name}`).join(', ');
+      info.innerHTML = `${ITEMS[r.out].name} x${r.n}<div class="req">${reqStr}</div>`;
+      row.appendChild(info);
+      row.addEventListener('click', ()=>{ doCraft(r); });
+      root.appendChild(row);
+    }
+  }
+}
+
+/* ---------- RENDERING ---------- */
+function skyColor(){
+  const f = dayFrac(); // 0 = dawn->day, 0.5 = dusk->night
+  // build a soft cycle: day 0-0.5, night 0.5-1
+  const t = Math.sin(f*Math.PI*2 - Math.PI/2)*0.5+0.5; // 0 at deepest night, 1 at noon
+  const topDay=[100,181,246], topNight=[10,10,30];
+  const botDay=[190,230,255], botNight=[30,20,55];
+  const lerp=(a,b,x)=>Math.round(a+(b-a)*x);
+  const top = `rgb(${lerp(topNight[0],topDay[0],t)},${lerp(topNight[1],topDay[1],t)},${lerp(topNight[2],topDay[2],t)})`;
+  const bot = `rgb(${lerp(botNight[0],botDay[0],t)},${lerp(botNight[1],botDay[1],t)},${lerp(botNight[2],botDay[2],t)})`;
+  return {top,bot,t};
+}
+
+function render(){
+  const p = state.player;
+  state.camX = clamp(p.x - canvas.width/2, 0, WORLD_W*TILE - canvas.width);
+  state.camY = clamp(p.y - canvas.height/2, -200, WORLD_H*TILE - canvas.height);
+
+  const sky = skyColor();
+  const grad = ctx.createLinearGradient(0,0,0,canvas.height);
+  grad.addColorStop(0, sky.top); grad.addColorStop(1, sky.bot);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  const x0 = Math.max(0, Math.floor(state.camX/TILE)-1);
+  const x1 = Math.min(WORLD_W-1, Math.ceil((state.camX+canvas.width)/TILE)+1);
+  const y0 = Math.max(0, Math.floor(state.camY/TILE)-1);
+  const y1 = Math.min(WORLD_H-1, Math.ceil((state.camY+canvas.height)/TILE)+1);
+
+  const underground = p.y/TILE > (world.surface[clamp(Math.floor(p.x/TILE),0,WORLD_W-1)]+3);
+
+  for(let ty=y0; ty<=y1; ty++){
+    for(let tx=x0; tx<=x1; tx++){
+      const t = world.grid[ty][tx];
+      if(t===AIR) continue;
+      const def = TILES[t];
+      const sx = tx*TILE - state.camX, sy = ty*TILE - state.camY;
+      ctx.fillStyle = def.color;
+      ctx.fillRect(sx,sy,TILE+1,TILE+1);
+      if(t===LEAF && (tx+ty*3)%3===0){ ctx.fillStyle='#3d9142'; ctx.fillRect(sx,sy,TILE+1,TILE+1); }
+      if(t===GRASS){ ctx.fillStyle = def.top; ctx.fillRect(sx,sy,TILE+1,4); }
+      if(def.dot){
+        ctx.fillStyle = def.dot;
+        ctx.fillRect(sx+3,sy+3,3,3); ctx.fillRect(sx+9,sy+9,3,3); ctx.fillRect(sx+9,sy+3,2,2);
+      }
+      if(def.glow){
+        ctx.fillStyle = def.glow; ctx.globalAlpha=0.5;
+        ctx.fillRect(sx+6,sy+6,4,4);
+        ctx.globalAlpha=1;
+      }
+      // simple shading on underground stone for depth feel
+    }
+  }
+
+  // torches light glow
+  for(let ty=y0; ty<=y1; ty++) for(let tx=x0; tx<=x1; tx++){
+    if(world.grid[ty][tx]===TORCH){
+      const sx = tx*TILE - state.camX + TILE/2, sy = ty*TILE - state.camY + TILE/2;
+      const g = ctx.createRadialGradient(sx,sy,2,sx,sy,70);
+      g.addColorStop(0,'rgba(255,180,80,0.35)'); g.addColorStop(1,'rgba(255,180,80,0)');
+      ctx.fillStyle=g; ctx.fillRect(sx-70,sy-70,140,140);
+    }
+  }
+
+  // particles
+  for(const pt of state.particles){
+    ctx.globalAlpha = clamp(pt.life/500,0,1);
+    ctx.fillStyle = pt.color;
+    ctx.fillRect(pt.x-state.camX-2, pt.y-state.camY-2, 4,4);
+    ctx.globalAlpha=1;
+  }
+
+  // mobs
+  for(const m of state.mobs){
+    const sx = m.x-state.camX, sy = m.y-state.camY;
+    ctx.fillStyle = MOB_TYPES[m.type].color;
+    ctx.fillRect(sx,sy,m.w,m.h);
+    ctx.fillStyle='#000a'; ctx.fillRect(sx,sy-6,m.w,3);
+    ctx.fillStyle='#e05353'; ctx.fillRect(sx,sy-6,m.w*clamp(m.hp/MOB_TYPES[m.type].hp,0,1),3);
+  }
+
+  // projectiles
+  ctx.fillStyle='#ffdf80';
+  for(const pr of state.projectiles){ ctx.fillRect(pr.x-state.camX-2,pr.y-state.camY-2,4,4); }
+
+  // boss
+  if(state.boss){
+    const b = state.boss;
+    const sx=b.x-state.camX, sy=b.y-state.camY;
+    ctx.fillStyle = b.mode==='charge' ? '#9b6fff' : '#6b4fa8';
+    ctx.fillRect(sx,sy,b.w,b.h);
+    ctx.fillStyle='#c98cff';
+    ctx.fillRect(sx+10,sy+14,8,8); ctx.fillRect(sx+b.w-18,sy+14,8,8);
+  }
+
+  // player
+  const psx = p.x-state.camX, psy = p.y-state.camY;
+  if(p.invuln>0 && Math.floor(state.time/100)%2===0){ ctx.globalAlpha=0.4; }
+  ctx.fillStyle = '#e8c07a';
+  ctx.fillRect(psx,psy,p.w,p.h);
+  ctx.fillStyle = '#3a2a1a';
+  ctx.fillRect(psx,psy+p.h-8,p.w,8);
+  ctx.globalAlpha=1;
+
+  // darkness overlay when underground (lit by player + torches)
+  if(underground){
+    if(!render.off || render.off.width!==canvas.width || render.off.height!==canvas.height){
+      render.off = document.createElement('canvas');
+      render.off.width = canvas.width; render.off.height = canvas.height;
+    }
+    const off = render.off;
+    const octx = off.getContext('2d');
+    octx.clearRect(0,0,off.width,off.height);
+    octx.fillStyle='rgba(4,2,10,0.86)';
+    octx.fillRect(0,0,off.width,off.height);
+    octx.globalCompositeOperation='destination-out';
+    function lightAt(sx,sy,r){
+      const g = octx.createRadialGradient(sx,sy,0,sx,sy,r);
+      g.addColorStop(0,'rgba(0,0,0,1)'); g.addColorStop(1,'rgba(0,0,0,0)');
+      octx.fillStyle=g; octx.fillRect(sx-r,sy-r,r*2,r*2);
+    }
+    lightAt(psx+p.w/2, psy+p.h/2, 150);
+    for(let ty=y0; ty<=y1; ty++) for(let tx=x0; tx<=x1; tx++){
+      if(world.grid[ty][tx]===TORCH){
+        lightAt(tx*TILE-state.camX+TILE/2, ty*TILE-state.camY+TILE/2, 130);
+      }
+      if(world.grid[ty][tx]===BRICKGLOW || world.grid[ty][tx]===ALTAR){
+        lightAt(tx*TILE-state.camX+TILE/2, ty*TILE-state.camY+TILE/2, 60);
+      }
+    }
+    octx.globalCompositeOperation='source-over';
+    ctx.drawImage(off,0,0);
+  }
+}
+
+/* ---------- UI TEXT UPDATE ---------- */
+function updateHUD(){
+  const p = state.player;
+  document.getElementById('hpfill').style.width = clamp(100*p.hp/p.maxhp,0,100)+'%';
+  document.getElementById('hptext').textContent = Math.ceil(p.hp)+' / '+p.maxhp;
+  const depthTiles = Math.max(0, Math.floor(p.y/TILE) - world.surface[clamp(Math.floor(p.x/TILE),0,WORLD_W-1)]);
+  document.getElementById('depth').textContent = depthTiles<=0 ? 'Surface' : ('Depth: '+depthTiles+' ft');
+  document.getElementById('daynight').textContent = isNight() ? '🌙 Night — mobs roam' : '☀ Day';
+}
+
+/* ---------- MAIN LOOP ---------- */
+let lastT = performance.now();
+function loop(now){
+  if(!state.running) return;
+  let dt = (now-lastT)/16.7; dt = clamp(dt,0,3);
+  lastT = now;
+  state.time += now - stepLast; stepLast = now;
+
+  if(!state.invOpen){
+    updatePlayer(dt);
+    updateMobs(dt);
+    updateProjectiles(dt);
+    updateParticles(dt);
+    updateBoss(dt);
+    updateSpawning(dt);
+    if(state.mouse.down && state.mouse.button===0) updateMining(dt);
+  }
+  render();
+  updateHUD();
+  requestAnimationFrame(loop);
+}
+let stepLast=performance.now();
+
+/* ---------- START ---------- */
+function startGame(){
+  document.getElementById('titlecard').style.display='none';
+  world = generateWorld(WORLD_W, WORLD_H);
+  state.player = spawnPlayer();
+  state.inv = new Array(40).fill(null);
+  addItem('wood_pickaxe',1);
+  addItem('wood_sword',1);
+  addItem('torch',5);
+  addItem('wood',10);
+  state.inv.sort((a,b)=>{ if(a&&!b)return -1; if(!a&&b)return 1; return 0; });
+  renderHotbar();
+  state.running = true;
+  stepLast = performance.now();
+  requestAnimationFrame(loop);
+  msg('Welcome to Deepcrag. Dig, craft, survive.');
+}
+</script>
+</body>
+</html>

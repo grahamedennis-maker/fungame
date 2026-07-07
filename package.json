@@ -1,0 +1,12 @@
+{
+  "name": "deepcrag",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "node scripts/serve.js",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}
