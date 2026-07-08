@@ -16,6 +16,23 @@ export function hash2(x,y){
   return (h>>>0) / 4294967296;
 }
 
+// Smooth value noise + fractal (fbm) built on hash2. Continuous in [0,1),
+// unlike hash2's per-integer jumps. Used only when baking tile textures at
+// load, so the smoothstep/multi-octave cost never touches the frame loop.
+export function valueNoise(x,y){
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x-xi, yf = y-yi;
+  const u = xf*xf*(3-2*xf), v = yf*yf*(3-2*yf);   // smoothstep
+  const a = hash2(xi,yi),   b = hash2(xi+1,yi);
+  const c = hash2(xi,yi+1), d = hash2(xi+1,yi+1);
+  return a*(1-u)*(1-v) + b*u*(1-v) + c*(1-u)*v + d*u*v;
+}
+export function fbm(x,y,oct=2){
+  let sum=0, amp=0.5, freq=1, norm=0;
+  for(let i=0;i<oct;i++){ sum += amp*valueNoise(x*freq,y*freq); norm += amp; amp*=0.5; freq*=2; }
+  return sum/norm;
+}
+
 // Lighten (amt>0) or darken (amt<0) a '#rrggbb' color by amt (-255..255).
 export function shade(hex, amt){
   const num = parseInt(hex.slice(1),16);

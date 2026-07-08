@@ -10,6 +10,7 @@ import { updateBoss, spawnBoss } from './boss.js';
 import { addItem, countItem } from './inventory.js';
 import { renderHotbar, msg, updateHUD } from './ui.js';
 import { render } from './render.js';
+import { buildAtlas } from './textures.js';
 import { initInput } from './input.js';
 import { hasSave, saveGame, loadGame, clearSave } from './save.js';
 
@@ -61,6 +62,7 @@ function loop(now){
 }
 
 function beginRunning(){
+  buildAtlas(); // bake the procedural tile-texture atlas once, before the first frame
   document.getElementById('titlecard').style.display='none';
   renderHotbar();
   state.running = true;

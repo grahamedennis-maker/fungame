@@ -9,6 +9,7 @@ import { BOSS_TYPES } from './boss.js';
 import { canvas, ctx } from './canvas.js';
 import { hotbarItem } from './inventory.js';
 import { drawItemIcon } from './icons.js';
+import { ATLAS_IDS, drawBodyTile, drawEdgeTile } from './textures.js';
 
 // Cached radial-glow sprites. Building a CanvasGradient + fill for every glowing
 // tile, torch and light source every frame is a major per-frame cost; instead we
@@ -167,6 +168,22 @@ function drawVineTile(sx,sy){
   const h = hash2(sx,sy);
   ctx.fillRect(sx+(h>0.5?1:11),sy+3,4,3);  // leaf
   ctx.fillRect(sx+(h>0.5?10:2),sy+10,4,3); // leaf
+}
+
+// Overhanging grass blades + the occasional flower, drawn above a surface-exposed
+// grass/snow tile. The tile body/top band is baked into the atlas; only these
+// tufts that poke ABOVE the cell stay a (cheap, surface-only) runtime pass.
+function drawGrassOverhang(t, def, sx, sy, tx, ty){
+  const h = hash2(tx,ty), h2 = hash2(tx*3.1+7, ty*5.7+3);
+  ctx.fillStyle = shade(def.top||def.color,-25);
+  if(h>0.4) ctx.fillRect(sx+2+Math.floor(h*3), sy-3, 2, 4);
+  if(h2>0.4) ctx.fillRect(sx+8+Math.floor(h2*4), sy-2, 2, 3);
+  if(h>0.5 && h2>0.5) ctx.fillRect(sx+13, sy-2, 2, 3);
+  if(t===GRASS && h*h2>0.62){
+    const fc = ['#e86a8a','#e8d24a','#8a6ae8'][Math.floor(h2*3)%3];
+    ctx.fillStyle = fc; ctx.fillRect(sx+4+Math.floor(h*6), sy-4, 2, 2);
+    ctx.fillStyle = '#ffe6a0'; ctx.fillRect(sx+5+Math.floor(h*6), sy-3, 1, 1);
+  }
 }
 
 function roundBlob(x,y,w,h,r){
@@ -352,127 +369,64 @@ export function render(){
       if(t===LADDER){ drawLadderTile(sx,sy); continue; }
       if(t===VINE){ drawVineTile(sx,sy); continue; }
 
-      // Round only the corners exposed to open space, so the terrain silhouette
-      // is organic instead of a hard grid. Interior tiles stay square (fast path).
       const oL = tileOpen(tx-1,ty), oR = tileOpen(tx+1,ty), oU = tileOpen(tx,ty-1), oD = tileOpen(tx,ty+1);
-      const cTL = oL&&oU, cTR = oR&&oU, cBR = oR&&oD, cBL = oL&&oD;
-      let clipped = false;
-      if(cTL||cTR||cBR||cBL){
-        const surfY = world.surface[tx];
-        if(ty > surfY+1){ // underground: back the cut corners with cave color, not stale sky
-          ctx.fillStyle = (ty-surfY)<9 ? '#3f2c1a' : '#2f2f38';
-          ctx.fillRect(sx,sy,TILE+1,TILE+1);
+
+      if(ATLAS_IDS.has(t)){
+        // Baked procedural texture: one drawImage for the body variant + one for
+        // the exposed-edge frame overlay. Replaces the per-frame base fill +
+        // mottle + material detail + ore dots + edge framing + rounded clip.
+        const dx = Math.floor(sx), dy = Math.floor(sy); // integer-align so 16px cells tile seamlessly
+        drawBodyTile(ctx, t, tx, ty, dx, dy);
+        const mask = (oU?1:0)|(oR?2:0)|(oD?4:0)|(oL?8:0);
+        if(mask) drawEdgeTile(ctx, mask, dx, dy);
+        if(def.top && oU) drawGrassOverhang(t, def, sx, sy, tx, ty); // surface tufts/flowers
+      } else {
+        // Legacy runtime detail for the few non-atlas tiles (leaves + furniture).
+        const cTL = oL&&oU, cTR = oR&&oU, cBR = oR&&oD, cBL = oL&&oD;
+        let clipped = false;
+        if(cTL||cTR||cBR||cBL){
+          const surfY = world.surface[tx];
+          if(ty > surfY+1){ ctx.fillStyle = (ty-surfY)<9 ? '#3f2c1a' : '#2f2f38'; ctx.fillRect(sx,sy,TILE+1,TILE+1); }
+          ctx.save();
+          roundTilePath(ctx, sx, sy, TILE+1, 5, cTL, cTR, cBR, cBL);
+          ctx.clip();
+          clipped = true;
         }
-        ctx.save();
-        roundTilePath(ctx, sx, sy, TILE+1, 5, cTL, cTR, cBR, cBL);
-        ctx.clip();
-        clipped = true;
-      }
-
-      // Mottle the base color of bulk ground tiles so wide expanses of stone/
-      // dirt/sand read with natural variation instead of one flat slab.
-      let baseCol = def.color;
-      if(t===STONE || t===DIRT || t===SAND){
-        baseCol = shade(def.color, Math.round((hash2(tx*1.7+1, ty*1.7+1)-0.5)*16));
-      }
-      ctx.fillStyle = baseCol;
-      ctx.fillRect(sx,sy,TILE+1,TILE+1);
-
-      // Terraria-style framing: shade/outline ONLY the edges that face open
-      // space, so a cluster of the same block reads as one merged mass rather
-      // than a grid of beveled squares. Interior edges stay seamless.
-      if(t!==LEAF){
-        ctx.fillStyle = shade(def.color,24);
-        if(oU) ctx.fillRect(sx,sy,TILE+1,2);
-        if(oL) ctx.fillRect(sx,sy,2,TILE+1);
-        ctx.fillStyle = shade(def.color,-30);
-        if(oD) ctx.fillRect(sx,sy+TILE-2,TILE+1,2);
-        if(oR) ctx.fillRect(sx+TILE-2,sy,2,TILE+1);
-        // dark 1px outline on the exposed silhouette
-        ctx.fillStyle = shade(def.color,-52);
-        if(oU) ctx.fillRect(sx,sy,TILE+1,1);
-        if(oD) ctx.fillRect(sx,sy+TILE-1,TILE+1,1);
-        if(oL) ctx.fillRect(sx,sy,1,TILE+1);
-        if(oR) ctx.fillRect(sx+TILE-1,sy,1,TILE+1);
-      }
-
-      const h = hash2(tx,ty), h2 = hash2(tx*3.1+7,ty*5.7+3);
-
-      if(def.top){ // grassy/snowy top layer with tufts, blades and flowers
-        ctx.fillStyle = def.top; ctx.fillRect(sx,sy,TILE+1,4);
-        ctx.fillStyle = shade(def.top,18); ctx.fillRect(sx,sy,TILE+1,1); // bright rim
-        ctx.fillStyle = shade(def.top,-25);
-        if(h>0.4){ ctx.fillRect(sx+2+Math.floor(h*3),sy-3,2,4); }        // blade
-        if(h2>0.4){ ctx.fillRect(sx+8+Math.floor(h2*4),sy-2,2,3); }      // blade
-        if(h>0.5 && h2>0.5){ ctx.fillRect(sx+13,sy-2,2,3); }
-        // occasional little flower on grass
-        if(t===GRASS && h*h2>0.62){
-          const fc = ['#e86a8a','#e8d24a','#8a6ae8'][Math.floor(h2*3)%3];
-          ctx.fillStyle = fc; ctx.fillRect(sx+4+Math.floor(h*6),sy-4,2,2);
-          ctx.fillStyle = '#ffe6a0'; ctx.fillRect(sx+5+Math.floor(h*6),sy-3,1,1);
+        ctx.fillStyle = def.color;
+        ctx.fillRect(sx,sy,TILE+1,TILE+1);
+        if(t!==LEAF){
+          ctx.fillStyle = shade(def.color,24);
+          if(oU) ctx.fillRect(sx,sy,TILE+1,2);
+          if(oL) ctx.fillRect(sx,sy,2,TILE+1);
+          ctx.fillStyle = shade(def.color,-30);
+          if(oD) ctx.fillRect(sx,sy+TILE-2,TILE+1,2);
+          if(oR) ctx.fillRect(sx+TILE-2,sy,2,TILE+1);
+          ctx.fillStyle = shade(def.color,-52);
+          if(oU) ctx.fillRect(sx,sy,TILE+1,1);
+          if(oD) ctx.fillRect(sx,sy+TILE-1,TILE+1,1);
+          if(oL) ctx.fillRect(sx,sy,1,TILE+1);
+          if(oR) ctx.fillRect(sx+TILE-1,sy,1,TILE+1);
         }
-      } else if(t===DIRT){
-        ctx.fillStyle = shade(def.color,-28);
-        ctx.fillRect(sx+3+Math.floor(h*7),sy+3+Math.floor(h2*7),2,2);
-        ctx.fillRect(sx+8+Math.floor(h2*5),sy+8+Math.floor(h*5),2,2);
-        ctx.fillStyle = shade(def.color,14); // small pebbles
-        if(h2>0.55) ctx.fillRect(sx+11+Math.floor(h*3),sy+4,2,2);
-        if(h>0.6) ctx.fillRect(sx+2,sy+11,2,2);
-      } else if(t===STONE){
-        // layered cracks, speckles, highlights and the odd moss fleck
-        ctx.fillStyle = shade(def.color,-24);
-        if(h>0.58){ ctx.fillRect(sx+3,sy+4,7,2); ctx.fillRect(sx+9,sy+6,2,6); }
-        else if(h2>0.6){ ctx.fillRect(sx+2,sy+9,6,2); ctx.fillRect(sx+7,sy+2,2,4); }
-        else { ctx.fillRect(sx+4,sy+8,2,5); }
-        ctx.fillStyle = shade(def.color,-38);
-        ctx.fillRect(sx+2+Math.floor(h*10),sy+2+Math.floor(h2*10),1,1);
-        ctx.fillRect(sx+5+Math.floor(h2*8),sy+11+Math.floor(h*3),1,1);
-        ctx.fillStyle = shade(def.color,20); // glints
-        ctx.fillRect(sx+3+Math.floor(h2*4),sy+2+Math.floor(h*3),2,2);
-        ctx.fillRect(sx+11,sy+10,1,1);
-        if((tx*7+ty*13)%23===0){ ctx.fillStyle='#3d6b3a'; ctx.fillRect(sx+9,sy+3,3,2); } // moss
-      } else if(t===SAND){
-        ctx.fillStyle = shade(def.color,-18);
-        ctx.fillRect(sx+2+Math.floor(h*10),sy+3+Math.floor(h2*8),2,1);
-        ctx.fillRect(sx+2+Math.floor(h2*10),sy+9+Math.floor(h*4),2,1);
-      } else if(t===WOODT || t===TREEWOOD){
-        ctx.fillStyle = shade(def.color,-22);
-        ctx.fillRect(sx+3,sy,2,TILE+1); ctx.fillRect(sx+10,sy,2,TILE+1);
-        ctx.fillStyle = shade(def.color,15);
-        ctx.fillRect(sx+6,sy,1,TILE+1);
-      } else if(t===LEAF){
-        if((tx+ty*3)%3===0){ ctx.fillStyle='#3d9142'; ctx.fillRect(sx,sy,TILE+1,TILE+1); }
-        if(h>0.7){ ctx.fillStyle=shade(def.color,-25); ctx.fillRect(sx+4+Math.floor(h2*5),sy+4+Math.floor(h*5),3,3); }
-      } else if(t===BRICK||t===BRICKGLOW||t===DUNGFLOOR){
-        ctx.fillStyle = shade(def.color,-30);
-        ctx.fillRect(sx,sy+7,TILE+1,1);
-        const vx = (ty%2===0) ? 0 : 8; // alternate offset per row for brick coursing
-        ctx.fillRect(sx+vx,sy,1,8);
-        ctx.fillRect(sx+((vx+8)%16),sy+8,1,8);
-      } else if(t===CRAFT_TABLE){
-        ctx.fillStyle = shade(def.color,28);
-        ctx.fillRect(sx+1,sy+1,TILE-1,3);
-        ctx.fillStyle = shade(def.color,-32);
-        ctx.fillRect(sx+2,sy+9,2,6); ctx.fillRect(sx+TILE-4,sy+9,2,6);
-      } else if(t===FURNACE){
-        ctx.fillStyle='#141414';
-        ctx.fillRect(sx+4,sy+7,8,7);
-      } else if(t===CHEST){
-        ctx.fillStyle = shade(def.color,-32);
-        ctx.fillRect(sx,sy+6,TILE+1,2);
-        ctx.fillStyle='#2a1c08';
-        ctx.fillRect(sx+7,sy+7,2,3);
+        const h = hash2(tx,ty), h2 = hash2(tx*3.1+7,ty*5.7+3);
+        if(t===LEAF){
+          if((tx+ty*3)%3===0){ ctx.fillStyle='#3d9142'; ctx.fillRect(sx,sy,TILE+1,TILE+1); }
+          if(h>0.7){ ctx.fillStyle=shade(def.color,-25); ctx.fillRect(sx+4+Math.floor(h2*5),sy+4+Math.floor(h*5),3,3); }
+        } else if(t===CRAFT_TABLE){
+          ctx.fillStyle = shade(def.color,28);
+          ctx.fillRect(sx+1,sy+1,TILE-1,3);
+          ctx.fillStyle = shade(def.color,-32);
+          ctx.fillRect(sx+2,sy+9,2,6); ctx.fillRect(sx+TILE-4,sy+9,2,6);
+        } else if(t===FURNACE){
+          ctx.fillStyle='#141414';
+          ctx.fillRect(sx+4,sy+7,8,7);
+        } else if(t===CHEST){
+          ctx.fillStyle = shade(def.color,-32);
+          ctx.fillRect(sx,sy+6,TILE+1,2);
+          ctx.fillStyle='#2a1c08';
+          ctx.fillRect(sx+7,sy+7,2,3);
+        }
+        if(clipped){ ctx.restore(); }
       }
-
-      if(def.dot){
-        ctx.fillStyle = shade(def.color,-22);
-        ctx.fillRect(sx+2,sy+2,TILE-3,TILE-3);
-        ctx.fillStyle = def.dot;
-        ctx.fillRect(sx+3,sy+3,3,3); ctx.fillRect(sx+9,sy+9,3,3); ctx.fillRect(sx+9,sy+3,2,2);
-        ctx.fillStyle = shade(def.dot,60);
-        ctx.fillRect(sx+3,sy+3,1,1); ctx.fillRect(sx+9,sy+9,1,1);
-      }
-      if(clipped){ ctx.restore(); clipped=false; } // stop clipping before glow so it can bleed past the rounded edge
       if(def.glow){
         ctx.globalAlpha=0.6;
         drawGlow(ctx, def.glow, 9, sx+8, sy+8, 1);
