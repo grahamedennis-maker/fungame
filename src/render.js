@@ -45,6 +45,29 @@ function tileOpen(tx,ty){
   const t = world.grid[ty][tx];
   return t===AIR || !(TILES[t] && TILES[t].solid);
 }
+// Cross-type blend: where an atlas tile borders a DIFFERENT solid atlas tile
+// (e.g. dirt/stone, stone/sand, grass/dirt), dither a few pixels of the
+// neighbour's colour across the shared edge so the layers bleed into each other
+// (8-bit-style transitions) instead of meeting at a hard square line.
+function blendEdge(t, tx, ty, dx, dy){
+  const nb = [[tx,ty-1,0],[tx,ty+1,1],[tx-1,ty,2],[tx+1,ty,3]];
+  for(const [nx,ny,side] of nb){
+    if(nx<0||ny<0||nx>=WORLD_W||ny>=WORLD_H) continue;
+    const nt = world.grid[ny][nx];
+    if(nt===t || !ATLAS_IDS.has(nt)) continue;
+    const nd = TILES[nt]; if(!nd || !nd.solid) continue;
+    ctx.fillStyle = nd.color;
+    for(let i=0;i<TILE;i+=2){
+      const h = hash2(tx*7+i+side, ty*11+side*3);
+      if(h<0.5) continue;
+      const d = h<0.8 ? 1 : 3; // most specks shallow, a few deeper -> ragged transition
+      if(side===0) ctx.fillRect(dx+i, dy, 2, d);
+      else if(side===1) ctx.fillRect(dx+i, dy+TILE-d, 2, d);
+      else if(side===2) ctx.fillRect(dx, dy+i, d, 2);
+      else ctx.fillRect(dx+TILE-d, dy+i, d, 2);
+    }
+  }
+}
 function roundTilePath(g, x, y, s, r, tl, tr, br, bl){
   g.beginPath();
   g.moveTo(x + (tl?r:0), y);
@@ -211,15 +234,23 @@ function drawGlowshroom(sx,sy){
 // grass/snow tile. The tile body/top band is baked into the atlas; only these
 // tufts that poke ABOVE the cell stay a (cheap, surface-only) runtime pass.
 function drawGrassOverhang(t, def, sx, sy, tx, ty){
+  const top = def.top || def.color;
+  // Bumpy grass fringe along the whole top edge so the surface line is ragged
+  // and organic, not a ruler-straight square edge.
+  ctx.fillStyle = top;
+  for(let i=0;i<TILE;i+=2){
+    const hh = hash2(tx*13+i, ty*7);
+    const up = hh<0.32 ? 0 : (hh<0.72 ? 1 : 2); // 0-2px grass bumps
+    if(up) ctx.fillRect(sx+i, sy-up, 2, up);
+  }
   const h = hash2(tx,ty), h2 = hash2(tx*3.1+7, ty*5.7+3);
-  ctx.fillStyle = shade(def.top||def.color,-25);
-  if(h>0.4) ctx.fillRect(sx+2+Math.floor(h*3), sy-3, 2, 4);
-  if(h2>0.4) ctx.fillRect(sx+8+Math.floor(h2*4), sy-2, 2, 3);
-  if(h>0.5 && h2>0.5) ctx.fillRect(sx+13, sy-2, 2, 3);
-  if(t===GRASS && h*h2>0.62){
+  ctx.fillStyle = shade(top,-25); // taller blades poking up
+  if(h>0.4) ctx.fillRect(sx+2+Math.floor(h*3), sy-4, 2, 4);
+  if(h2>0.5) ctx.fillRect(sx+9+Math.floor(h2*4), sy-3, 2, 3);
+  if(t===GRASS && h*h2>0.66){ // wildflower
     const fc = ['#e86a8a','#e8d24a','#8a6ae8'][Math.floor(h2*3)%3];
-    ctx.fillStyle = fc; ctx.fillRect(sx+4+Math.floor(h*6), sy-4, 2, 2);
-    ctx.fillStyle = '#ffe6a0'; ctx.fillRect(sx+5+Math.floor(h*6), sy-3, 1, 1);
+    ctx.fillStyle = fc; ctx.fillRect(sx+5+Math.floor(h*5), sy-5, 2, 2);
+    ctx.fillStyle = '#ffe6a0'; ctx.fillRect(sx+6+Math.floor(h*5), sy-4, 1, 1);
   }
 }
 
@@ -391,12 +422,15 @@ export function render(){
         // the surface, stone deeper) instead of open sky — a Terraria-style look
         const surfY = world.surface[tx];
         if(ty > surfY+1){
-          const depth = ty - surfY, h = hash2(tx,ty);
-          const sx0 = tx*TILE - state.camX, sy0 = ty*TILE - state.camY;
-          ctx.fillStyle = depth<9 ? (h>0.5?'#4a3320':'#402c1b') : (h>0.5?'#33333c':'#2b2b33');
+          const depth = ty - surfY, h = hash2(tx,ty), h2 = hash2(tx*3+1, ty*5+2);
+          const sx0 = tx*TILE - state.camX, sy0 = ty*TILE - state.camY, light = depth<9;
+          ctx.fillStyle = light ? (h>0.5?'#4a3320':'#402c1b') : (h>0.5?'#33333c':'#2b2b33');
           ctx.fillRect(sx0,sy0,TILE+1,TILE+1);
-          ctx.fillStyle = depth<9 ? '#00000022' : '#00000033';
-          if(h>0.7) ctx.fillRect(sx0+4,sy0+4,4,4);
+          // rough rock-wall dither so the cave background reads as chipped stone, not a flat square
+          ctx.fillStyle = light ? '#2f2013' : '#22222b';
+          ctx.fillRect(sx0+Math.floor(h*11), sy0+Math.floor(h2*11), 3,3);
+          if(h2>0.55) ctx.fillRect(sx0+1+Math.floor(h2*10), sy0+1+Math.floor(h*9), 2,2);
+          if(h>0.6){ ctx.fillStyle = light ? '#57432a' : '#3c3c4a'; ctx.fillRect(sx0+2+Math.floor(h2*8), sy0+3, 2,2); }
         }
         continue;
       }
@@ -422,9 +456,10 @@ export function render(){
         if(cTL||cTR||cBR||cBL){
           const surfY=world.surface[tx];
           if(ty>surfY+1){ ctx.fillStyle=(ty-surfY)<9?'#3f2c1a':'#2f2f38'; ctx.fillRect(dx,dy,TILE+1,TILE+1); } // cave backing behind cut corners
-          ctx.save(); roundTilePath(ctx, dx, dy, TILE+1, 4, cTL, cTR, cBR, cBL); ctx.clip(); clipped=true;
+          ctx.save(); roundTilePath(ctx, dx, dy, TILE+1, 5, cTL, cTR, cBR, cBL); ctx.clip(); clipped=true;
         }
         drawBodyTile(ctx, t, tx, ty, dx, dy);
+        blendEdge(t, tx, ty, dx, dy); // dither different-type borders so layers bleed together
         const mask = (oU?1:0)|(oR?2:0)|(oD?4:0)|(oL?8:0);
         if(mask) drawEdgeTile(ctx, mask, dx, dy);
         if(clipped) ctx.restore();
