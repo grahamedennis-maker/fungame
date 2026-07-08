@@ -169,44 +169,74 @@ function drawVineTile(sx,sy){
   ctx.fillRect(sx+(h>0.5?10:2),sy+10,4,3); // leaf
 }
 
-// Each boss gets a distinct silhouette so they're recognizable at a glance.
+function roundBlob(x,y,w,h,r){
+  r = Math.min(r, w/2, h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,   x+w,y+h, r);
+  ctx.arcTo(x+w,y+h, x,  y+h, r);
+  ctx.arcTo(x,  y+h, x,  y,   r);
+  ctx.arcTo(x,  y,   x+w,y,   r);
+  ctx.closePath(); ctx.fill();
+}
+
+// Bosses rendered as menacing Terraria-style creatures: a large themed body, a
+// big glowing eye whose pupil tracks the player, and a jagged fanged maw.
 function drawBoss(b, bd){
   const sx=b.x-state.camX, sy=b.y-state.camY, W=b.w, H=b.h;
-  const body = b.mode==='charge' ? bd.chargeColor : bd.color;
+  const cx=sx+W/2, cy=sy+H/2;
+  const p=state.player;
+  const look=Math.atan2((p.y+p.h/2)-(b.y+b.h/2), (p.x+p.w/2)-(b.x+b.w/2));
+  const body=b.mode==='charge'?bd.chargeColor:bd.color;
+
+  // ---- BODY (themed silhouette) ----
   ctx.fillStyle = body;
   if(b.type==='magma'){
-    // bulky molten brute with horns and glowing cracks
-    ctx.fillRect(sx,sy+12,W,H-12);
-    ctx.fillRect(sx+6,sy+4,W-12,12);
-    ctx.fillStyle = shade(body,-35);
-    ctx.beginPath(); ctx.moveTo(sx+10,sy+8); ctx.lineTo(sx,sy-12); ctx.lineTo(sx+22,sy+6); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(sx+W-10,sy+8); ctx.lineTo(sx+W,sy-12); ctx.lineTo(sx+W-22,sy+6); ctx.fill();
-    ctx.strokeStyle = '#ffcf5a'; ctx.lineWidth=2;
-    ctx.beginPath();
-    ctx.moveTo(sx+16,sy+16); ctx.lineTo(sx+24,sy+32); ctx.lineTo(sx+18,sy+H-4);
-    ctx.moveTo(sx+W-18,sy+18); ctx.lineTo(sx+W-28,sy+36);
-    ctx.stroke(); ctx.lineWidth=1;
+    roundBlob(sx+2,sy+6,W-4,H-6,12);
+    ctx.fillStyle=shade(body,-32); // horns
+    ctx.beginPath(); ctx.moveTo(sx+10,sy+10); ctx.lineTo(sx-4,sy-14); ctx.lineTo(sx+24,sy+6); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(sx+W-10,sy+10); ctx.lineTo(sx+W+4,sy-14); ctx.lineTo(sx+W-24,sy+6); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#ffcf5a'; ctx.lineWidth=2; // lava cracks
+    ctx.beginPath(); ctx.moveTo(sx+14,sy+22); ctx.lineTo(sx+22,sy+36); ctx.lineTo(sx+16,sy+H-6);
+    ctx.moveTo(sx+W-16,sy+24); ctx.lineTo(sx+W-26,sy+40); ctx.stroke(); ctx.lineWidth=1;
   } else if(b.type==='frost'){
-    // angular ice crystal with a shard crown and hanging icicles
-    ctx.beginPath();
-    ctx.moveTo(sx+W/2,sy-6); ctx.lineTo(sx+W,sy+18); ctx.lineTo(sx+W-8,sy+H);
-    ctx.lineTo(sx+8,sy+H); ctx.lineTo(sx,sy+18); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = shade(body,55);
-    ctx.beginPath(); ctx.moveTo(sx+W/2-9,sy+6); ctx.lineTo(sx+W/2,sy-18); ctx.lineTo(sx+W/2+9,sy+6); ctx.fill();
-    for(let i=0;i<4;i++){ const ix=sx+12+i*((W-24)/3);
-      ctx.beginPath(); ctx.moveTo(ix,sy+H-3); ctx.lineTo(ix+6,sy+H-3); ctx.lineTo(ix+3,sy+H+12); ctx.fill(); }
+    ctx.beginPath(); // faceted ice golem
+    ctx.moveTo(cx,sy-6); ctx.lineTo(sx+W,sy+16); ctx.lineTo(sx+W-6,sy+H);
+    ctx.lineTo(sx+6,sy+H); ctx.lineTo(sx,sy+16); ctx.closePath(); ctx.fill();
+    ctx.fillStyle=shade(body,55); // shard crown
+    for(let i=0;i<3;i++){ const ix=cx-16+i*16;
+      ctx.beginPath(); ctx.moveTo(ix,sy+4); ctx.lineTo(ix+4,sy-16); ctx.lineTo(ix+8,sy+4); ctx.closePath(); ctx.fill(); }
+    for(let i=0;i<4;i++){ const ix=sx+12+i*((W-24)/3); // icicles
+      ctx.beginPath(); ctx.moveTo(ix,sy+H-3); ctx.lineTo(ix+6,sy+H-3); ctx.lineTo(ix+3,sy+H+12); ctx.closePath(); ctx.fill(); }
   } else {
-    // storm: tall figure with a jagged lightning crown
-    ctx.fillRect(sx+3,sy+2,W-6,H-2);
-    ctx.fillStyle = shade(body,-28);
-    for(let i=0;i<5;i++){ const ix=sx+6+i*((W-12)/4);
-      ctx.beginPath(); ctx.moveTo(ix,sy+3); ctx.lineTo(ix+4,sy-13); ctx.lineTo(ix+8,sy+3); ctx.fill(); }
+    // storm / guardian: a floating eyeball-orb with a jagged lightning crown
+    roundBlob(sx+2,sy+2,W-4,H-4,Math.min(W,H)/2);
+    ctx.fillStyle=shade(body,-28);
+    for(let i=0;i<5;i++){ const ix=sx+8+i*((W-16)/4);
+      ctx.beginPath(); ctx.moveTo(ix,sy+6); ctx.lineTo(ix+4,sy-12); ctx.lineTo(ix+8,sy+6); ctx.closePath(); ctx.fill(); }
   }
-  // glowing eyes (all bosses)
-  ctx.fillStyle = bd.eye;
-  ctx.fillRect(sx+12,sy+16,8,8); ctx.fillRect(sx+W-20,sy+16,8,8);
-  ctx.fillStyle = '#1a0a1a';
-  ctx.fillRect(sx+15,sy+19,3,3); ctx.fillRect(sx+W-17,sy+19,3,3);
+
+  // ---- BIG TRACKING EYE ----
+  const eyeR=Math.min(W,H)*0.30, eyeX=cx, eyeY=cy-H*0.06;
+  ctx.fillStyle='#f4f0ff';
+  ctx.beginPath(); ctx.arc(eyeX,eyeY,eyeR,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(170,50,80,0.45)'; ctx.lineWidth=1; // blood veins
+  for(let i=0;i<4;i++){ const a=i/4*Math.PI*2;
+    ctx.beginPath(); ctx.moveTo(eyeX+Math.cos(a)*eyeR*0.35, eyeY+Math.sin(a)*eyeR*0.35);
+    ctx.lineTo(eyeX+Math.cos(a+0.3)*eyeR, eyeY+Math.sin(a+0.3)*eyeR); ctx.stroke(); }
+  const ix2=eyeX+Math.cos(look)*eyeR*0.42, iy2=eyeY+Math.sin(look)*eyeR*0.42; // iris follows player
+  const g=ctx.createRadialGradient(ix2,iy2,1,ix2,iy2,eyeR*0.65);
+  g.addColorStop(0,bd.eye); g.addColorStop(1,shade(bd.eye,-60));
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(ix2,iy2,eyeR*0.6,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#0a0510'; ctx.beginPath(); ctx.arc(ix2,iy2,eyeR*0.28,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(ix2-eyeR*0.18,iy2-eyeR*0.18,eyeR*0.12,0,Math.PI*2); ctx.fill();
+
+  // ---- JAGGED MAW ----
+  const mawW=W*0.5, mawX=cx-mawW/2, mawY=sy+H-8, teeth=5;
+  ctx.fillStyle='#1a0a12'; ctx.fillRect(mawX,mawY,mawW,6);
+  ctx.fillStyle='#f4f0ff';
+  for(let i=0;i<teeth;i++){ const tx=mawX+i*(mawW/teeth);
+    ctx.beginPath(); ctx.moveTo(tx,mawY); ctx.lineTo(tx+mawW/teeth/2,mawY+5); ctx.lineTo(tx+mawW/teeth,mawY); ctx.closePath(); ctx.fill(); }
 }
 
 // Parallax sky: celestial body, stars, drifting clouds and distant hills.
@@ -348,12 +378,22 @@ export function render(){
       ctx.fillStyle = baseCol;
       ctx.fillRect(sx,sy,TILE+1,TILE+1);
 
-      // beveled edge so blocks read as chunky and distinct rather than flat
+      // Terraria-style framing: shade/outline ONLY the edges that face open
+      // space, so a cluster of the same block reads as one merged mass rather
+      // than a grid of beveled squares. Interior edges stay seamless.
       if(t!==LEAF){
-        ctx.fillStyle = shade(def.color,26);
-        ctx.fillRect(sx,sy,TILE+1,2); ctx.fillRect(sx,sy,2,TILE+1);
+        ctx.fillStyle = shade(def.color,24);
+        if(oU) ctx.fillRect(sx,sy,TILE+1,2);
+        if(oL) ctx.fillRect(sx,sy,2,TILE+1);
         ctx.fillStyle = shade(def.color,-30);
-        ctx.fillRect(sx,sy+TILE-2,TILE+1,2); ctx.fillRect(sx+TILE-2,sy,2,TILE+1);
+        if(oD) ctx.fillRect(sx,sy+TILE-2,TILE+1,2);
+        if(oR) ctx.fillRect(sx+TILE-2,sy,2,TILE+1);
+        // dark 1px outline on the exposed silhouette
+        ctx.fillStyle = shade(def.color,-52);
+        if(oU) ctx.fillRect(sx,sy,TILE+1,1);
+        if(oD) ctx.fillRect(sx,sy+TILE-1,TILE+1,1);
+        if(oL) ctx.fillRect(sx,sy,1,TILE+1);
+        if(oR) ctx.fillRect(sx+TILE-1,sy,1,TILE+1);
       }
 
       const h = hash2(tx,ty), h2 = hash2(tx*3.1+7,ty*5.7+3);
