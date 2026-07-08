@@ -14,17 +14,17 @@ import { msg } from './ui.js';
 export const BOSS_TYPES = {
   storm: {
     name:'The Storm King', color:'#6b4fa8', chargeColor:'#9b6fff', eye:'#c98cff',
-    w:60, h:52, hp:900, drop:{ thunder_shard:4, storm_core:6, coin:120, thunder_hammer:1 },
+    w:60, h:52, hp:900, drop:{ thunder_shard:4, storm_core:6, coin:120, thunder_hammer:1, terra_blade:1 },
     projColor:'#c98cff', attacks:['volley','charge'],
   },
   magma: {
     name:'Cinder Colossus', color:'#7a2e18', chargeColor:'#ff6a2c', eye:'#ffcf5a',
-    w:64, h:56, hp:1050, drop:{ ember_core:6, gold_bar:6, coin:120, fire_sword:1 },
+    w:64, h:56, hp:1050, drop:{ ember_core:6, gold_bar:6, coin:120, fire_sword:1, sunfury:1 },
     projColor:'#ff8a3c', attacks:['fireRain','charge'],
   },
   frost: {
     name:'Glacial Warden', color:'#2b5a7a', chargeColor:'#8fe0ff', eye:'#e8faff',
-    w:58, h:54, hp:980, drop:{ frost_core:6, iron_bar:8, coin:120, water_trident:1 },
+    w:58, h:54, hp:980, drop:{ frost_core:6, iron_bar:8, coin:120, water_trident:1, nights_edge:1 },
     projColor:'#bfefff', attacks:['iceSpread','summon'],
   },
   // Mini-boss summoned when you claim the relic legendary from its altar.

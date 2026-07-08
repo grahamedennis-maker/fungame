@@ -1,5 +1,5 @@
 import { TILE, REACH, AIR, ALTAR, COAL, IRON, GOLD, THORIUM, WORLD_H, BEDROCK,
-         WOODT, LEAF } from './constants.js';
+         TREEWOOD, LEAF } from './constants.js';
 import { clamp, ri, chance } from './utils.js';
 import { state, world } from './state.js';
 import { tileAt, setTile, tileDef, tileSolid } from './worldgen.js';
@@ -54,6 +54,34 @@ export function doAttack(){
     removeItem('arrow',1);
     const p = state.player;
     state.projectiles.push({ x:p.x+p.w/2, y:p.y+p.h/2, vx: p.facing*7, vy:-1, life:1800, from:'player', dmg });
+    return;
+  }
+  if(tool && tool.tool==='flail'){
+    // Flail: swing a heavy fiery ball in an arc in front, knocking mobs back and
+    // igniting them. Hits everything in the swing wedge, not just one target.
+    const p = state.player, reach = tool.range||50;
+    const pcx = p.x+p.w/2, pcy = p.y+p.h/2;
+    for(const m of state.mobs){
+      const ddx=(m.x+m.w/2)-pcx, ddy=(m.y+m.h/2)-pcy;
+      if(Math.abs(ddx)<=reach && Math.abs(ddy)<=42 && ddx*p.facing>=-14){
+        m.hp -= dmg; m.vx += p.facing*4.5; m.vy -= 2.5;
+        m.burn = Math.max(m.burn||0, 1500);
+        spawnParticles(m.x+m.w/2, m.y+m.h/2, tool.color||'#ff8a3c', 5);
+      }
+    }
+    if(state.boss){ const b=state.boss, ddx=(b.x+b.w/2)-pcx, ddy=(b.y+b.h/2)-pcy;
+      if(Math.abs(ddx)<=reach+18 && Math.abs(ddy)<=50) hitBoss(dmg); }
+    return;
+  }
+  if(tool && tool.tool==='boomerang'){
+    // Boomerang: hurl toward the cursor; it flies out, then homes back to you,
+    // damaging mobs along the whole path (see updateProjectiles).
+    const p = state.player;
+    const ang = Math.atan2((state.mouse.y+state.camY)-(p.y+p.h/2), (state.mouse.x+state.camX)-(p.x+p.w/2));
+    const sp = 8.5;
+    state.projectiles.push({ x:p.x+p.w/2, y:p.y+p.h/2, vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp,
+      life:1600, from:'player', dmg, color:tool.color||'#ff6a3c', straight:true, fiery:true,
+      boomerang:true, outT:340, hitMobs:new Set() });
     return;
   }
   const target = tryMob();
@@ -197,6 +225,25 @@ export function doSpecial(){
     for(let i=0;i<34;i++) spawnParticles(pcx, gy, i%3?'#e8faff':'#9fb8e8', 1);
     state.flashes.push({ color:'rgba(210,220,255,0.4)', life:200 });
     msg('🔨 GROUND SLAM!');
+  } else if(tool.special==='beam'){
+    // Blade beam: a fast slashing projectile that pierces every mob in its line.
+    const dir = p.facing;
+    const color = tool.beam || '#bfffd0';
+    state.projectiles.push({ x:pcx, y:pcy, vx:dir*12, vy:0, life:900, from:'player',
+      dmg:Math.round(tool.dmg*1.3), color, straight:true, pierce:true, beam:true, hitMobs:new Set() });
+    for(let i=0;i<16;i++) spawnParticles(pcx+dir*14, pcy+ri(-8,8), color, 1);
+    state.waves.push({ x:pcx+dir*10, y:pcy, r:6, max:52, life:220, color:'150,255,190' });
+    msg('⚔ Blade Beam!');
+  } else if(tool.special==='boomerang'){
+    // Flamarang storm: a fan of three homing fiery boomerangs.
+    for(let a=-1;a<=1;a++){
+      const ang = (p.facing>0?0:Math.PI) + a*0.34;
+      state.projectiles.push({ x:pcx, y:pcy, vx:Math.cos(ang)*9.5, vy:Math.sin(ang)*9.5-1,
+        life:1700, from:'player', dmg:tool.dmg, color:'#ff8a3c', straight:true, fiery:true,
+        boomerang:true, outT:400, hitMobs:new Set() });
+    }
+    for(let i=0;i<16;i++) spawnParticles(pcx, pcy, '#ff8a3c', 1);
+    msg('🔥 Flamarang Storm!');
   }
 }
 
@@ -241,9 +288,10 @@ export function updateMining(dt){
 }
 
 /* ---------- FALLING BLOCKS (Terraria-style tree collapse) ---------- */
-// Tiles that tumble when the block beneath them is removed. Trees are the main
-// case: chop any part of a trunk and everything resting on it drops.
-const FALLABLE = new Set([WOODT, LEAF]);
+// Tiles that tumble when the block beneath them is removed. Only natural tree
+// trunks (TREEWOOD) and leaves fall — wood the player places to build (WOODT)
+// stays put, so structures don't collapse.
+const FALLABLE = new Set([TREEWOOD, LEAF]);
 // When a tile is cleared, detach the contiguous run of fallable tiles directly
 // above it into free-falling blocks (each becomes a live physics entity).
 export function dislodgeAbove(tx,ty){
@@ -274,7 +322,8 @@ export function updateFalling(dt){
 }
 
 const dungeonLoot = ['thunder_shard','gold_bar','iron_bar','storm_core','arrow'];
-const LEGENDARIES = ['thunder_hammer','water_trident','fire_sword','tempest_bow'];
+const LEGENDARIES = ['thunder_hammer','water_trident','fire_sword','tempest_bow',
+                     'nights_edge','terra_blade','sunfury','flamarang'];
 const ENHANCED = ['frost_edge','ember_axe','volt_bow','storm_maul'];
 export function openChest(tx,ty){
   setTile(tx,ty,AIR);
@@ -379,23 +428,39 @@ export function updateProjectiles(dt){
   const p = state.player;
   for(let i=state.projectiles.length-1;i>=0;i--){
     const pr = state.projectiles[i];
+    pr.age = (pr.age||0) + dt*16.7;
+    // Boomerangs fly out, then curve back to the player and vanish on return.
+    if(pr.boomerang && pr.age>pr.outT){
+      const cx=p.x+p.w/2, cy=p.y+p.h/2;
+      const ang=Math.atan2(cy-pr.y, cx-pr.x), sp=10;
+      pr.vx=Math.cos(ang)*sp; pr.vy=Math.sin(ang)*sp;
+      if(Math.hypot(cx-pr.x, cy-pr.y)<16){ state.projectiles.splice(i,1); continue; }
+    }
     pr.x += pr.vx*dt; pr.y += pr.vy*dt;
-    if(!pr.straight) pr.vy += (pr.fiery?0.05:0.12)*dt;
+    if(!pr.straight && !pr.boomerang) pr.vy += (pr.fiery?0.05:0.12)*dt;
     pr.life -= dt*16.7;
     if(pr.fiery && chance(0.6)) spawnParticles(pr.x, pr.y, '#ff8a3c', 1);
     const tx = Math.floor(pr.x/TILE), ty = Math.floor(pr.y/TILE);
     let hit=false;
-    if(tileSolid(tileAt(tx,ty))) hit=true;
+    // beams stop at walls; boomerangs fly over terrain
+    if(!pr.boomerang && tileSolid(tileAt(tx,ty))) hit=true;
     if(pr.from==='mob' && Math.abs(pr.x-(p.x+p.w/2))<14 && Math.abs(pr.y-(p.y+p.h/2))<16){
       damagePlayer(pr.dmg); hit=true;
     }
     if(pr.from==='player' && state.boss && state.boss.hp>0){
       const b=state.boss;
-      if(pr.x>b.x && pr.x<b.x+b.w && pr.y>b.y && pr.y<b.y+b.h){ hitBoss(pr.dmg); hit=true; }
+      if(pr.x>b.x && pr.x<b.x+b.w && pr.y>b.y && pr.y<b.y+b.h){
+        if(pr.pierce||pr.boomerang){ if(!pr.hitBossDone){ hitBoss(pr.dmg); pr.hitBossDone=true; } }
+        else { hitBoss(pr.dmg); hit=true; }
+      }
     }
     if(pr.from==='player'){
       for(const m of state.mobs){
-        if(pr.x>m.x && pr.x<m.x+m.w && pr.y>m.y && pr.y<m.y+m.h){ m.hp-=pr.dmg; hit=true; break; }
+        if(pr.x>m.x && pr.x<m.x+m.w && pr.y>m.y && pr.y<m.y+m.h){
+          if(pr.hitMobs){ if(pr.hitMobs.has(m)) continue; pr.hitMobs.add(m); } // pierce/boomerang: once per mob
+          m.hp-=pr.dmg;
+          if(!pr.pierce && !pr.boomerang){ hit=true; break; }
+        }
       }
     }
     if(pr.life<=0 || hit) state.projectiles.splice(i,1);

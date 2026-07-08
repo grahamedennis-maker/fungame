@@ -1,6 +1,6 @@
 import { WORLD_W, WORLD_H, AIR, DIRT, GRASS, STONE, WOODT, LEAF, COAL, IRON, GOLD,
          THORIUM, BEDROCK, BRICK, BRICKGLOW, CHEST, ALTAR, DUNGFLOOR, CLOUD, SKYBRICK,
-         LADDER, VINE, TORCH, SAND, SNOW, ICE, CACTUS, JUNGLEGRASS } from './constants.js';
+         LADDER, VINE, TORCH, SAND, SNOW, ICE, CACTUS, JUNGLEGRASS, TREEWOOD } from './constants.js';
 import { TILES } from './tiles.js';
 import { rand, ri, chance, clamp } from './utils.js';
 import { world } from './state.js';
@@ -60,7 +60,7 @@ export function generateWorld(W,H){
   function placeTree(x, snowy){
     const sy = surface[x];
     const th = ri(4,7);
-    for(let i=1;i<=th;i++){ if(sy-i>0) grid[sy-i][x]=WOODT; }
+    for(let i=1;i<=th;i++){ if(sy-i>0) grid[sy-i][x]=TREEWOOD; } // natural trunk (collapses when chopped)
     const topY = sy-th, canopyR = ri(2,3);
     for(let ly=-canopyR; ly<=canopyR-1; ly++) for(let lx=-canopyR; lx<=canopyR; lx++){
       if(Math.abs(lx)+Math.abs(ly*1.3) <= canopyR+0.6){
@@ -315,7 +315,7 @@ export function generateWorld(W,H){
   // also clear leaves directly beside the vine so nothing visually swallows it
   for(let y=skyY-2; y<vineGroundY; y++){
     for(const nx of [vineX-1, vineX+1]){
-      if(nx>0 && nx<W-1 && (grid[y][nx]===LEAF || grid[y][nx]===WOODT)) grid[y][nx]=AIR;
+      if(nx>0 && nx<W-1 && (grid[y][nx]===LEAF || grid[y][nx]===WOODT || grid[y][nx]===TREEWOOD)) grid[y][nx]=AIR;
     }
   }
 
@@ -326,7 +326,8 @@ export function generateWorld(W,H){
   // Each holds a random legendary; claiming one summons a mini-boss guardian
   // (handled in combat). Count scales with world size, with a guaranteed
   // minimum so there are always a handful to find.
-  const LEG = ['thunder_hammer','water_trident','fire_sword','tempest_bow'];
+  const LEG = ['thunder_hammer','water_trident','fire_sword','tempest_bow',
+               'nights_edge','terra_blade','sunfury','flamarang'];
   const wantRelics = Math.max(4, Math.round(W/1400));
   const relics = [];
   for(const c of caves){

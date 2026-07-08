@@ -1,6 +1,6 @@
 import { WORLD_W, WORLD_H, TILE, AIR, DIRT, GRASS, STONE, WOODT, LEAF,
          BRICK, BRICKGLOW, CHEST, ALTAR, TORCH, CRAFT_TABLE, FURNACE, SAND, DUNGFLOOR,
-         LADDER, VINE } from './constants.js';
+         LADDER, VINE, TREEWOOD } from './constants.js';
 import { clamp, hash2, shade } from './utils.js';
 import { state, world } from './state.js';
 import { TILES, ITEMS } from './tiles.js';
@@ -119,7 +119,7 @@ function drawHeldTool(p, psx, psy){
   // grip, eased so it snaps through the middle of the swing.
   const e = active ? (1 - (1-t)*(1-t)) : 1;                 // ease-out
   const rot = active ? (SWING_START + (SWING_END-SWING_START)*e) : SWING_REST;
-  if(active && (tool==='sword' || tool==='hammer')) drawSlash(handX, handY, p.facing, rot, size, def);
+  if(active && (tool==='sword' || tool==='hammer' || tool==='flail')) drawSlash(handX, handY, p.facing, rot, size, def);
   ctx.save();
   ctx.translate(handX,handY);
   if(p.facing<0) ctx.scale(-1,1);
@@ -339,7 +339,13 @@ export function render(){
         clipped = true;
       }
 
-      ctx.fillStyle = def.color;
+      // Mottle the base color of bulk ground tiles so wide expanses of stone/
+      // dirt/sand read with natural variation instead of one flat slab.
+      let baseCol = def.color;
+      if(t===STONE || t===DIRT || t===SAND){
+        baseCol = shade(def.color, Math.round((hash2(tx*1.7+1, ty*1.7+1)-0.5)*16));
+      }
+      ctx.fillStyle = baseCol;
       ctx.fillRect(sx,sy,TILE+1,TILE+1);
 
       // beveled edge so blocks read as chunky and distinct rather than flat
@@ -389,7 +395,7 @@ export function render(){
         ctx.fillStyle = shade(def.color,-18);
         ctx.fillRect(sx+2+Math.floor(h*10),sy+3+Math.floor(h2*8),2,1);
         ctx.fillRect(sx+2+Math.floor(h2*10),sy+9+Math.floor(h*4),2,1);
-      } else if(t===WOODT){
+      } else if(t===WOODT || t===TREEWOOD){
         ctx.fillStyle = shade(def.color,-22);
         ctx.fillRect(sx+3,sy,2,TILE+1); ctx.fillRect(sx+10,sy,2,TILE+1);
         ctx.fillStyle = shade(def.color,15);
@@ -472,8 +478,14 @@ export function render(){
   // projectiles (boss/special shots carry their own color)
   for(const pr of state.projectiles){
     ctx.fillStyle = pr.color || '#ffdf80';
-    const s = pr.fiery ? 5 : 4;
-    ctx.fillRect(pr.x-state.camX-s/2,pr.y-state.camY-s/2,s,s);
+    const s = pr.beam ? 8 : (pr.fiery ? 5 : 4);
+    if(pr.beam){ // elongate the beam along its travel direction
+      const horiz = Math.abs(pr.vx) >= Math.abs(pr.vy);
+      const w = horiz ? 16 : s, h = horiz ? s : 16;
+      ctx.fillRect(pr.x-state.camX-w/2, pr.y-state.camY-h/2, w, h);
+    } else {
+      ctx.fillRect(pr.x-state.camX-s/2,pr.y-state.camY-s/2,s,s);
+    }
   }
 
   // TNT bombs (blink faster as the fuse runs down)

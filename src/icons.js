@@ -125,6 +125,38 @@ function hammer(ctx,color,size){
   ctx.restore();
 }
 
+function flail(ctx,color,size){
+  // wooden handle
+  ctx.strokeStyle='#6e4a28'; ctx.lineWidth=Math.max(2,size*0.08); ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(size*0.16,size*0.9); ctx.lineTo(size*0.36,size*0.56); ctx.stroke();
+  // chain
+  ctx.strokeStyle='#9a9a9a'; ctx.lineWidth=Math.max(1,size*0.045);
+  ctx.beginPath(); ctx.moveTo(size*0.36,size*0.56); ctx.lineTo(size*0.58,size*0.34); ctx.stroke();
+  // spiked ball
+  const cx=size*0.64, cy=size*0.3, r=size*0.19;
+  ctx.fillStyle=shade(color,-25);
+  for(let a=0;a<8;a++){ const an=a/8*Math.PI*2;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(an)*r, cy+Math.sin(an)*r);
+    ctx.lineTo(cx+Math.cos(an)*r*1.55, cy+Math.sin(an)*r*1.55);
+    ctx.lineTo(cx+Math.cos(an+0.5)*r, cy+Math.sin(an+0.5)*r);
+    ctx.closePath(); ctx.fill(); }
+  ctx.fillStyle=color; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=shade(color,60); ctx.beginPath(); ctx.arc(cx-r*0.3,cy-r*0.3,r*0.35,0,Math.PI*2); ctx.fill();
+}
+
+function boomerang(ctx,color,size){
+  ctx.strokeStyle=color; ctx.lineWidth=Math.max(2,size*0.17); ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.beginPath();
+  ctx.moveTo(size*0.24,size*0.22); ctx.lineTo(size*0.52,size*0.62); ctx.lineTo(size*0.82,size*0.4);
+  ctx.stroke();
+  ctx.strokeStyle=shade(color,55); ctx.lineWidth=Math.max(1,size*0.055);
+  ctx.beginPath();
+  ctx.moveTo(size*0.27,size*0.24); ctx.lineTo(size*0.52,size*0.56); ctx.lineTo(size*0.78,size*0.4);
+  ctx.stroke();
+  ctx.lineCap='butt'; ctx.lineJoin='miter';
+}
+
 function arrow(ctx,color,size){
   ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = Math.max(1,size*0.06);
   ctx.beginPath(); ctx.moveTo(size*0.2,size*0.82); ctx.lineTo(size*0.76,size*0.24); ctx.stroke();
@@ -224,6 +256,8 @@ function pick(id, def){
   if(def.tool==='sword') return sword;
   if(def.tool==='bow') return bow;
   if(def.tool==='hammer') return hammer;
+  if(def.tool==='flail') return flail;
+  if(def.tool==='boomerang') return boomerang;
   if(id.endsWith('_bar')) return bar;
   if(id.endsWith('_ore') || id==='coal') return ore;
   if(def.glow) return gem;

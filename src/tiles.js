@@ -1,14 +1,14 @@
 import { AIR, DIRT, GRASS, STONE, WOODT, LEAF, COAL, IRON, GOLD,
          THORIUM, BEDROCK, BRICK, BRICKGLOW, CHEST, ALTAR,
          TORCH, CRAFT_TABLE, FURNACE, SAND, DUNGFLOOR, CLOUD, SKYBRICK, LADDER, VINE,
-         SNOW, ICE, CACTUS, JUNGLEGRASS } from './constants.js';
+         SNOW, ICE, CACTUS, JUNGLEGRASS, TREEWOOD } from './constants.js';
 
 export const TILES = {
   [AIR]:      { name:'Air', solid:false },
   [DIRT]:     { name:'Dirt', color:'#6b4a2c', hardness:1, tier:0, solid:true, drop:'dirt' },
   [GRASS]:    { name:'Grass', color:'#4f9e3f', top:'#3d7d31', hardness:1, tier:0, solid:true, drop:'dirt' },
   [STONE]:    { name:'Stone', color:'#7d7d7d', hardness:2.2, tier:0, solid:true, drop:'stone' },
-  [WOODT]:    { name:'Wood', color:'#8a5a2b', hardness:2.8, tier:0, solid:true, drop:'wood' },
+  [WOODT]:    { name:'Wood', color:'#8a5a2b', hardness:1.2, tier:0, solid:true, drop:'wood' },
   [LEAF]:     { name:'Leaves', color:'#2f7d32', hardness:0.4, tier:0, solid:false, drop:null },
   [COAL]:     { name:'Coal Ore', color:'#3a3a3a', hardness:2.6, tier:0, solid:true, drop:'coal', dot:'#111111' },
   [IRON]:     { name:'Iron Ore', color:'#9c7a5c', hardness:3.2, tier:1, solid:true, drop:'iron_ore', dot:'#d8b48a' },
@@ -32,6 +32,7 @@ export const TILES = {
   [ICE]:      { name:'Ice', color:'#a6d6ef', hardness:1.4, tier:0, solid:true, drop:null, glow:'#cdeaff' },
   [CACTUS]:   { name:'Cactus', color:'#4b8a3a', hardness:0.8, tier:0, solid:true, drop:'wood' },
   [JUNGLEGRASS]:{ name:'Jungle Grass', color:'#3f8a2c', top:'#2f6d1f', hardness:1, tier:0, solid:true, drop:'dirt' },
+  [TREEWOOD]: { name:'Wood', color:'#8a5a2b', hardness:2.8, tier:0, solid:true, drop:'wood' }, // tree trunk (slow to chop, collapses)
 };
 
 export const ITEMS = {
@@ -81,6 +82,14 @@ export const ITEMS = {
   water_trident:{ name:'Tide Trident', color:'#3fb6ff', stack:1, tool:'sword', dmg:26, range:40, glow:true, legendary:true, special:'wave' },
   fire_sword:  { name:'Emberbrand', color:'#ff6a2c', stack:1, tool:'sword', dmg:30, range:34, glow:true, legendary:true, special:'magma' },
   tempest_bow: { name:'Tempest Bow', color:'#8fe0ff', stack:1, tool:'bow', dmg:22, range:260, glow:true, legendary:true, special:'volley' },
+
+  // ---- TERRARIA-STYLE DROP-ONLY WEAPONS (boss / dungeon loot) ----
+  // Melee blades fire a slashing beam on their special; the flail and boomerang
+  // swing/throw fiery projectiles.
+  nights_edge: { name:"Night's Edge", color:'#c86adf', stack:1, tool:'sword', dmg:32, range:34, glow:true, legendary:true, special:'beam', beam:'#d99bff', specialCd:3500 },
+  terra_blade: { name:'Terra Blade', color:'#4fd07a', stack:1, tool:'sword', dmg:40, range:36, glow:true, legendary:true, special:'beam', beam:'#7dffb0', specialCd:3000 },
+  sunfury:     { name:'Sunfury', color:'#ff8a2c', stack:1, tool:'flail', dmg:30, range:54, glow:true, legendary:true, special:'magma', specialCd:6000 },
+  flamarang:   { name:'Flamarang', color:'#ff6a3c', stack:1, tool:'boomerang', dmg:26, range:200, glow:true, legendary:true, special:'boomerang', specialCd:4000 },
 
   // ---- TNT: throw it (right-click), short fuse, blasts tiles + mobs ----
   tnt:         { name:'TNT', color:'#c23a2a', stack:99, throwable:true },
