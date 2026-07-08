@@ -1,7 +1,8 @@
 import { AIR, DIRT, GRASS, STONE, WOODT, LEAF, COAL, IRON, GOLD,
          THORIUM, BEDROCK, BRICK, BRICKGLOW, CHEST, ALTAR,
          TORCH, CRAFT_TABLE, FURNACE, SAND, DUNGFLOOR, CLOUD, SKYBRICK, LADDER, VINE,
-         SNOW, ICE, CACTUS, JUNGLEGRASS, TREEWOOD, WATER, DRIPSTONE, MOSS, GLOWSHROOM } from './constants.js';
+         SNOW, ICE, CACTUS, JUNGLEGRASS, TREEWOOD, WATER, DRIPSTONE, MOSS, GLOWSHROOM,
+         MUD, JUNGLEWOOD, JUNGLELEAF } from './constants.js';
 
 export const TILES = {
   [AIR]:      { name:'Air', solid:false },
@@ -31,16 +32,20 @@ export const TILES = {
   [SNOW]:     { name:'Snow', color:'#dbe6ef', top:'#ffffff', hardness:1, tier:0, solid:true, drop:'dirt' },
   [ICE]:      { name:'Ice', color:'#a6d6ef', hardness:1.4, tier:0, solid:true, drop:null, glow:'#cdeaff' },
   [CACTUS]:   { name:'Cactus', color:'#4b8a3a', hardness:0.8, tier:0, solid:true, drop:'wood' },
-  [JUNGLEGRASS]:{ name:'Jungle Grass', color:'#3f8a2c', top:'#2f6d1f', hardness:1, tier:0, solid:true, drop:'dirt' },
+  [JUNGLEGRASS]:{ name:'Jungle Grass', color:'#46a02b', top:'#74cf3e', hardness:1, tier:0, solid:true, drop:'mud' }, // vivid Surface-Jungle green
   [TREEWOOD]: { name:'Wood', color:'#8a5a2b', hardness:2.8, tier:0, solid:true, drop:'wood' }, // tree trunk (slow to chop, collapses)
   [WATER]:    { name:'Water', color:'#2e6ebe', solid:false, drop:null, liquid:true },
   [DRIPSTONE]:{ name:'Dripstone', color:'#6f6a63', solid:false, drop:null },       // cave spike décor
   [MOSS]:     { name:'Mossy Stone', color:'#5c7d4a', hardness:2.2, tier:0, solid:true, drop:'stone' },
   [GLOWSHROOM]:{ name:'Glowing Mushroom', color:'#6fe0c8', solid:false, drop:null, glow:'#7fffe0', light:true },
+  [MUD]:      { name:'Mud', color:'#5c3a26', hardness:1, tier:0, solid:true, drop:'mud' },              // jungle ground
+  [JUNGLEWOOD]:{ name:'Mahogany', color:'#7a3f28', hardness:2.8, tier:0, solid:true, drop:'wood' },     // jungle trunk (collapses)
+  [JUNGLELEAF]:{ name:'Jungle Foliage', color:'#256b1f', hardness:0.4, tier:0, solid:false, drop:null },
 };
 
 export const ITEMS = {
   dirt:        { name:'Dirt', color:'#6b4a2c', stack:99, place:DIRT },
+  mud:         { name:'Mud', color:'#5c3a26', stack:99, place:MUD },
   stone:       { name:'Stone', color:'#7d7d7d', stack:99, place:STONE },
   wood:        { name:'Wood', color:'#8a5a2b', stack:99, place:WOODT },
   coal:        { name:'Coal', color:'#2b2b2b', stack:99 },

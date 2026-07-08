@@ -1,5 +1,5 @@
 import { TILE, REACH, AIR, ALTAR, COAL, IRON, GOLD, THORIUM, WORLD_H, BEDROCK,
-         TREEWOOD, LEAF } from './constants.js';
+         TREEWOOD, LEAF, JUNGLEWOOD, JUNGLELEAF } from './constants.js';
 import { clamp, ri, chance } from './utils.js';
 import { state, world } from './state.js';
 import { tileAt, setTile, tileDef, tileSolid } from './worldgen.js';
@@ -309,7 +309,7 @@ export function updateMining(dt){
 // Tiles that tumble when the block beneath them is removed. Only natural tree
 // trunks (TREEWOOD) and leaves fall — wood the player places to build (WOODT)
 // stays put, so structures don't collapse.
-const FALLABLE = new Set([TREEWOOD, LEAF]);
+const FALLABLE = new Set([TREEWOOD, LEAF, JUNGLEWOOD, JUNGLELEAF]);
 // When a tile is cleared, detach the contiguous run of fallable tiles directly
 // above it into free-falling blocks (each becomes a live physics entity).
 export function dislodgeAbove(tx,ty){

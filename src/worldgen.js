@@ -1,7 +1,7 @@
 import { WORLD_W, WORLD_H, AIR, DIRT, GRASS, STONE, WOODT, LEAF, COAL, IRON, GOLD,
          THORIUM, BEDROCK, BRICK, BRICKGLOW, CHEST, ALTAR, DUNGFLOOR, CLOUD, SKYBRICK,
          LADDER, VINE, TORCH, SAND, SNOW, ICE, CACTUS, JUNGLEGRASS, TREEWOOD,
-         WATER, DRIPSTONE, MOSS, GLOWSHROOM } from './constants.js';
+         WATER, DRIPSTONE, MOSS, GLOWSHROOM, MUD, JUNGLEWOOD, JUNGLELEAF } from './constants.js';
 import { TILES } from './tiles.js';
 import { rand, ri, chance, clamp } from './utils.js';
 import { world } from './state.js';
@@ -45,11 +45,12 @@ export function generateWorld(W,H){
         // topsoil layer varies by biome
         if(b==='desert')      grid[y][x] = SAND;
         else if(b==='snow')   grid[y][x] = (y<sy+2) ? SNOW : DIRT;
-        else if(b==='jungle') grid[y][x] = (y===sy) ? JUNGLEGRASS : DIRT;
+        else if(b==='jungle') grid[y][x] = (y===sy) ? JUNGLEGRASS : MUD;
         else                  grid[y][x] = (y===sy) ? GRASS : DIRT;
         if(b==='snow' && y===sy) grid[y][x] = SNOW;
       } else {
         grid[y][x] = STONE;
+        if(b==='jungle' && y<sy+9) grid[y][x] = MUD; // thick mud layer beneath the jungle
         // scattered ice pockets under the snow biome
         if(b==='snow' && chance(0.05)) grid[y][x] = ICE;
       }
@@ -58,18 +59,17 @@ export function generateWorld(W,H){
   }
 
   // ---- FLORA (biome-aware) ----
-  function placeTree(x, snowy){
+  function placeTree(x, wood, leaf){
     const sy = surface[x];
-    const leaf = snowy ? SNOW : LEAF;
     const th = ri(7,13); // tall Terraria-style trunk
-    for(let i=1;i<=th;i++){ if(sy-i>0) grid[sy-i][x]=TREEWOOD; } // natural trunk (collapses when chopped)
+    for(let i=1;i<=th;i++){ if(sy-i>0) grid[sy-i][x]=wood; } // natural trunk (collapses when chopped)
     // little angled roots at the base
-    if(x-1>0 && grid[sy-1][x-1]===AIR) grid[sy-1][x-1]=TREEWOOD;
-    if(x+1<W && grid[sy-1][x+1]===AIR) grid[sy-1][x+1]=TREEWOOD;
+    if(x-1>0 && grid[sy-1][x-1]===AIR) grid[sy-1][x-1]=wood;
+    if(x+1<W && grid[sy-1][x+1]===AIR) grid[sy-1][x+1]=wood;
     // side branches with a small leaf "paw" at each tip, at a few mid-heights
     for(let k=0, nB=ri(2,3); k<nB; k++){
       const by = sy - ri(3, th-2), dir = chance(0.5)?-1:1, blen = ri(1,2);
-      for(let j=1;j<=blen;j++){ const bx=x+dir*j; if(bx>0&&bx<W&&by>0 && grid[by][bx]===AIR) grid[by][bx]=TREEWOOD; }
+      for(let j=1;j<=blen;j++){ const bx=x+dir*j; if(bx>0&&bx<W&&by>0 && grid[by][bx]===AIR) grid[by][bx]=wood; }
       const tipx = x+dir*(blen+1);
       for(let ly=-1;ly<=1;ly++) for(let lx=-1;lx<=1;lx++){
         const xx=tipx+lx, yy=by+ly;
@@ -96,10 +96,11 @@ export function generateWorld(W,H){
     if(b==='desert'){
       if(x-lastTreeX>5 && chance(0.06)){ lastTreeX=x; placeCactus(x); }
     } else if(b==='snow'){
-      if(x-lastTreeX>6 && chance(0.16)){ lastTreeX=x; placeTree(x,true); }
+      if(x-lastTreeX>6 && chance(0.16)){ lastTreeX=x; placeTree(x, TREEWOOD, SNOW); }
     } else {
-      const dens = b==='jungle' ? 0.34 : 0.20;
-      if(x-lastTreeX>6 && chance(dens)){ lastTreeX=x; placeTree(x,false); }
+      const dens = b==='jungle' ? 0.40 : 0.20; // jungle is densely wooded
+      if(x-lastTreeX>6 && chance(dens)){ lastTreeX=x;
+        if(b==='jungle') placeTree(x, JUNGLEWOOD, JUNGLELEAF); else placeTree(x, TREEWOOD, LEAF); }
       // hanging jungle vines
       if(b==='jungle' && chance(0.10)){
         const sy=surface[x], vl=ri(2,5);

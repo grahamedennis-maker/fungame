@@ -1,6 +1,6 @@
 import { WORLD_W, WORLD_H, TILE, AIR, DIRT, GRASS, STONE, WOODT, LEAF,
          BRICK, BRICKGLOW, CHEST, ALTAR, TORCH, CRAFT_TABLE, FURNACE, SAND, DUNGFLOOR,
-         LADDER, VINE, TREEWOOD, WATER, DRIPSTONE, GLOWSHROOM } from './constants.js';
+         LADDER, VINE, TREEWOOD, WATER, DRIPSTONE, GLOWSHROOM, JUNGLELEAF } from './constants.js';
 import { clamp, hash2, shade } from './utils.js';
 import { state, world } from './state.js';
 import { TILES, ITEMS } from './tiles.js';
@@ -492,9 +492,9 @@ export function render(){
           if(oR) ctx.fillRect(sx+TILE-1,sy,1,TILE+1);
         }
         const h = hash2(tx,ty), h2 = hash2(tx*3.1+7,ty*5.7+3);
-        if(t===LEAF){
+        if(t===LEAF || t===JUNGLELEAF){
           // dappled foliage: color variation + darker clumps + light highlights + berries
-          if((tx+ty*3)%3===0){ ctx.fillStyle='#4aa64a'; ctx.fillRect(sx,sy,TILE+1,TILE+1); }
+          if((tx+ty*3)%3===0){ ctx.fillStyle=shade(def.color,20); ctx.fillRect(sx,sy,TILE+1,TILE+1); }
           ctx.fillStyle = shade(def.color,-24);
           ctx.fillRect(sx+2+Math.floor(h*4), sy+2+Math.floor(h2*4), 3,3);
           ctx.fillRect(sx+9+Math.floor(h2*4), sy+8+Math.floor(h*4), 2,2);
