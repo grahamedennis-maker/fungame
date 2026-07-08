@@ -1,9 +1,16 @@
-import { WORLD_W, WORLD_H, TILE, GRAVITY, MOVE_SPEED, JUMP_VEL } from './constants.js';
+import { WORLD_W, WORLD_H, TILE, GRAVITY, MOVE_SPEED, JUMP_VEL, WATER } from './constants.js';
 import { clamp } from './utils.js';
 import { state, world } from './state.js';
 import { tileAt, tileSolid, tileDef } from './worldgen.js';
 
 const CLIMB_SPEED = 2.2;
+// True when the entity's lower body is submerged in water.
+function inWater(e){
+  const x0=Math.floor(e.x/TILE), x1=Math.floor((e.x+e.w-1)/TILE);
+  const y0=Math.floor((e.y+e.h*0.45)/TILE), y1=Math.floor((e.y+e.h-1)/TILE);
+  for(let tx=x0;tx<=x1;tx++) for(let ty=y0;ty<=y1;ty++) if(tileAt(tx,ty)===WATER) return true;
+  return false;
+}
 // If the entity's body overlaps a climbable tile (ladder/vine), return that
 // tile's column; else -1. Checks the player's full width (not just center) so
 // you can grab a ladder you're merely touching, not perfectly centered on.
@@ -40,8 +47,13 @@ export function moveEntity(e, dt){
   // horizontal
   let nx = e.x + e.vx*dt;
   if(!aabbSolid(nx, e.y, e.w, e.h)) e.x = nx; else e.vx = 0;
-  // vertical — gravity is suspended while climbing a ladder/vine
-  if(!e.climbing){
+  // vertical — gravity is suspended while climbing, softened + damped while swimming
+  if(e.climbing){
+    /* no gravity while on a ladder/vine */
+  } else if(e.swim){
+    e.vy += GRAVITY*0.30*dt;          // buoyancy: much weaker gravity in water
+    e.vy = clamp(e.vy, -5, 4.5);       // capped sink/rise speed
+  } else {
     e.vy += GRAVITY*dt;
     e.vy = clamp(e.vy, -20, 14);
   }
@@ -71,7 +83,7 @@ export function updatePlayer(dt){
   const cc = climbColumn(p);
   const wantClimb = cc>=0 && (up || down || p.climbing);
   if(wantClimb){
-    p.climbing = true;
+    p.climbing = true; p.swim = false;
     p.vy = up ? -CLIMB_SPEED : (down ? CLIMB_SPEED : 0);
     // when not steering sideways, ease onto the ladder's column so a 1-wide
     // climb shaft through rock still fits; steering sideways lets you slide off
@@ -81,7 +93,11 @@ export function updatePlayer(dt){
     }
   } else {
     p.climbing = false;
-    if(up && p.onGround){ p.vy = JUMP_VEL; p.onGround=false; } // single jump only
+    p.swim = inWater(p);
+    if(p.swim){
+      p.vx *= 0.72;                                 // water drag on horizontal
+      if(up) p.vy = -2.9;                            // swim/kick upward
+    } else if(up && p.onGround){ p.vy = JUMP_VEL; p.onGround=false; } // single jump only
   }
   moveEntity(p, dt);
   p.x = clamp(p.x, 0, WORLD_W*TILE-p.w);

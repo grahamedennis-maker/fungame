@@ -1,7 +1,7 @@
 import { TILES } from './tiles.js';
 import { DIRT, GRASS, STONE, WOODT, COAL, IRON, GOLD, THORIUM, BEDROCK, BRICK,
          BRICKGLOW, SAND, DUNGFLOOR, CLOUD, SKYBRICK, SNOW, ICE, CACTUS,
-         JUNGLEGRASS, TREEWOOD } from './constants.js';
+         JUNGLEGRASS, TREEWOOD, MOSS } from './constants.js';
 import { hash2, fbm, shade } from './utils.js';
 
 /* ---------- PROCEDURAL TILE-TEXTURE ATLAS ----------
@@ -86,6 +86,12 @@ function bakeIce(g,def,v,id){
   fillMottle(g,def.color,v,id,14);
   g.fillStyle=shade(def.color,40); g.fillRect(3,3,5,1); g.fillRect(9,8,4,1); // glint streaks
 }
+function bakeMoss(g,def,v,id){          // gray stone body speckled with green moss
+  fillMottle(g,'#6f6f6f',v,id,26);
+  const r=rng(id*151+v*331);
+  for(let i=0;i<6;i++){ g.fillStyle=(i%2)?'#4f8a3f':'#3d6b32'; g.fillRect((r()*13|0),(r()*13|0), 2+(r()*2|0), 2+(r()*2|0)); }
+  g.fillStyle='#63a84c'; g.fillRect((r()*12|0)+1,(r()*4|0),3,1);
+}
 function bakeDefault(g,def,v,id){
   fillMottle(g,def.color,v,id,18);
   g.fillStyle=shade(def.color,20); g.fillRect(2,2,3,1);
@@ -99,7 +105,7 @@ const CFG = [
   [GRASS,bakeTop,3,'hash'], [SNOW,bakeTop,3,'hash'], [JUNGLEGRASS,bakeTop,3,'hash'],
   [WOODT,bakeGrain,3,'hash'], [TREEWOOD,bakeGrain,3,'hash'], [CACTUS,bakeGrain,2,'hash'],
   [BRICK,bakeBrick,2,'row'], [BRICKGLOW,bakeBrick,2,'row'], [DUNGFLOOR,bakeBrick,2,'row'], [SKYBRICK,bakeBrick,2,'row'],
-  [CLOUD,bakeDefault,3,'hash'], [ICE,bakeIce,3,'hash'],
+  [CLOUD,bakeDefault,3,'hash'], [ICE,bakeIce,3,'hash'], [MOSS,bakeMoss,4,'hash'],
 ];
 const MAXV = 6;
 export const ATLAS_IDS = new Set(CFG.map(c=>c[0]));

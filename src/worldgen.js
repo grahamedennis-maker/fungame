@@ -1,6 +1,7 @@
 import { WORLD_W, WORLD_H, AIR, DIRT, GRASS, STONE, WOODT, LEAF, COAL, IRON, GOLD,
          THORIUM, BEDROCK, BRICK, BRICKGLOW, CHEST, ALTAR, DUNGFLOOR, CLOUD, SKYBRICK,
-         LADDER, VINE, TORCH, SAND, SNOW, ICE, CACTUS, JUNGLEGRASS, TREEWOOD } from './constants.js';
+         LADDER, VINE, TORCH, SAND, SNOW, ICE, CACTUS, JUNGLEGRASS, TREEWOOD,
+         WATER, DRIPSTONE, MOSS, GLOWSHROOM } from './constants.js';
 import { TILES } from './tiles.js';
 import { rand, ri, chance, clamp } from './utils.js';
 import { world } from './state.js';
@@ -125,6 +126,36 @@ export function generateWorld(W,H){
     }
   }
 
+  // Dress a carved cavern with Terraria-style biome décor: dripstone spikes on
+  // ceilings/floors, lush moss + glowing mushrooms in overgrown pockets, and
+  // water pooling on the floor of wet caverns.
+  function decorateCave(cx0,cx1,cy0,cy1,deep){
+    const lush = chance(0.4), wet = deep && chance(0.5);
+    const xa=Math.max(2,cx0), xb=Math.min(W-2,cx1), ya=Math.max(3,cy0), yb=Math.min(H-3,cy1);
+    for(let x=xa;x<xb;x++) for(let y=ya;y<yb;y++){
+      if(grid[y][x]!==AIR) continue;
+      const up=grid[y-1][x], dn=grid[y+1][x];
+      const solidUp = up!==AIR && TILES[up] && TILES[up].solid;
+      const solidDn = dn!==AIR && TILES[dn] && TILES[dn].solid;
+      if(solidUp && !solidDn && chance(0.06)) grid[y][x]=DRIPSTONE;                       // stalactite
+      else if(solidDn && !solidUp && chance(0.05)) grid[y][x] = (lush && chance(0.45)) ? GLOWSHROOM : DRIPSTONE; // stalagmite / shroom
+    }
+    if(lush){ // moss creeping over exposed cave walls
+      for(let x=xa;x<xb;x++) for(let y=ya;y<yb;y++){
+        if(grid[y][x]!==STONE || !chance(0.14)) continue;
+        if(grid[y-1][x]===AIR||grid[y+1][x]===AIR||grid[y][x-1]===AIR||grid[y][x+1]===AIR) grid[y][x]=MOSS;
+      }
+    }
+    if(wet){ // water settling on the cavern floor
+      const level = Math.floor(cy0 + (cy1-cy0)*0.5);
+      for(let x=xa;x<xb;x++) for(let y=yb-1;y>level;y--){
+        if(grid[y][x]!==AIR) continue;
+        const b=grid[y+1][x];
+        if((TILES[b] && TILES[b].solid) || b===WATER) grid[y][x]=WATER;
+      }
+    }
+  }
+
   // Underground caverns: open pockets carved by a random walk ("worm"),
   // distinct from the tunnels the player digs by hand. Each cavern gets an
   // extra, boosted ore pass along its walls (more minerals) and its bounding
@@ -171,6 +202,7 @@ export function generateWorld(W,H){
     if(y1b>=30) scatterOre(IRON, 3, y0b, y1b, 2,4, x0b, x1b);
     if(y1b>=55) scatterOre(GOLD, 2, y0b, y1b, 2,3, x0b, x1b);
     if(y1b>=85) scatterOre(THORIUM, 1, y0b, y1b, 1,3, x0b, x1b);
+    decorateCave(x0b, x1b, y0b, y1b, deep); // dripstone / lush moss+shrooms / water pools
   }
 
   // Ore counts scale with world size so a giant world isn't barren.

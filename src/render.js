@@ -1,6 +1,6 @@
 import { WORLD_W, WORLD_H, TILE, AIR, DIRT, GRASS, STONE, WOODT, LEAF,
          BRICK, BRICKGLOW, CHEST, ALTAR, TORCH, CRAFT_TABLE, FURNACE, SAND, DUNGFLOOR,
-         LADDER, VINE, TREEWOOD } from './constants.js';
+         LADDER, VINE, TREEWOOD, WATER, DRIPSTONE, GLOWSHROOM } from './constants.js';
 import { clamp, hash2, shade } from './utils.js';
 import { state, world } from './state.js';
 import { TILES, ITEMS } from './tiles.js';
@@ -168,6 +168,43 @@ function drawVineTile(sx,sy){
   const h = hash2(sx,sy);
   ctx.fillRect(sx+(h>0.5?1:11),sy+3,4,3);  // leaf
   ctx.fillRect(sx+(h>0.5?10:2),sy+10,4,3); // leaf
+}
+
+// Translucent water: cave background behind it, blue tint, and a wavy surface
+// highlight where its top is open.
+function drawWaterTile(tx,ty,sx,sy){
+  const surfY = world.surface[tx];
+  if(ty > surfY+1){ const depth=ty-surfY, h=hash2(tx,ty);
+    ctx.fillStyle = depth<9 ? (h>0.5?'#4a3320':'#402c1b') : (h>0.5?'#33333c':'#2b2b33');
+    ctx.fillRect(sx,sy,TILE+1,TILE+1); }
+  ctx.fillStyle = 'rgba(38,108,190,0.6)';
+  ctx.fillRect(sx,sy,TILE+1,TILE+1);
+  const above = world.grid[ty-1] ? world.grid[ty-1][tx] : 0;
+  if(above!==WATER){
+    ctx.fillStyle='rgba(150,215,255,0.5)';
+    ctx.fillRect(sx, sy + ((Math.floor(state.time/280)+tx)%2), TILE+1, 2); // gentle ripple
+  }
+}
+// Dripstone spike — points down as a stalactite (solid ceiling above) or up as a
+// stalagmite (solid floor below).
+function drawDripstone(tx,ty,sx,sy){
+  const down = !tileOpen(tx,ty-1); // solid above => hanging stalactite
+  ctx.fillStyle = '#6f6a63';
+  ctx.beginPath();
+  if(down){ ctx.moveTo(sx+2,sy); ctx.lineTo(sx+14,sy); ctx.lineTo(sx+8,sy+15); }
+  else    { ctx.moveTo(sx+2,sy+TILE); ctx.lineTo(sx+14,sy+TILE); ctx.lineTo(sx+8,sy+1); }
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = shade('#6f6a63',-22);
+  ctx.fillRect(sx+7, down?sy+2:sy+5, 2, 9);
+  ctx.fillStyle = shade('#6f6a63',26);
+  ctx.fillRect(down?sx+4:sx+9, down?sy+1:sy+4, 2, 4);
+}
+// Glowing cave mushroom (soft light + capped stalk).
+function drawGlowshroom(sx,sy){
+  drawGlow(ctx, '#7fffe0', 12, sx+8, sy+8, 1);
+  ctx.fillStyle='#e6ded0'; ctx.fillRect(sx+7,sy+8,2,7);          // stalk
+  ctx.fillStyle='#5fd0b8'; ctx.beginPath(); ctx.arc(sx+8,sy+7,4,0,Math.PI*2); ctx.fill(); // cap
+  ctx.fillStyle='#bfffe8'; ctx.fillRect(sx+6,sy+5,1,1); ctx.fillRect(sx+10,sy+6,1,1); // spots
 }
 
 // Overhanging grass blades + the occasional flower, drawn above a surface-exposed
@@ -369,17 +406,28 @@ export function render(){
       if(t===TORCH){ drawTorchTile(sx,sy); torchLights.push({x:sx+TILE/2, y:sy+TILE/2}); continue; }
       if(t===LADDER){ drawLadderTile(sx,sy); continue; }
       if(t===VINE){ drawVineTile(sx,sy); continue; }
+      if(t===WATER){ drawWaterTile(tx,ty,sx,sy); continue; }
+      if(t===DRIPSTONE){ drawDripstone(tx,ty,sx,sy); continue; }
+      if(t===GLOWSHROOM){ drawGlowshroom(sx,sy); dimLights.push({x:sx+8, y:sy+8}); continue; }
 
       const oL = tileOpen(tx-1,ty), oR = tileOpen(tx+1,ty), oU = tileOpen(tx,ty-1), oD = tileOpen(tx,ty+1);
 
       if(ATLAS_IDS.has(t)){
         // Baked procedural texture: one drawImage for the body variant + one for
-        // the exposed-edge frame overlay. Replaces the per-frame base fill +
-        // mottle + material detail + ore dots + edge framing + rounded clip.
+        // the exposed-edge frame overlay. Exposed corners are rounded (clipped)
+        // so the terrain silhouette reads organic instead of a hard grid.
         const dx = Math.floor(sx), dy = Math.floor(sy); // integer-align so 16px cells tile seamlessly
+        const cTL=oL&&oU, cTR=oR&&oU, cBR=oR&&oD, cBL=oL&&oD;
+        let clipped=false;
+        if(cTL||cTR||cBR||cBL){
+          const surfY=world.surface[tx];
+          if(ty>surfY+1){ ctx.fillStyle=(ty-surfY)<9?'#3f2c1a':'#2f2f38'; ctx.fillRect(dx,dy,TILE+1,TILE+1); } // cave backing behind cut corners
+          ctx.save(); roundTilePath(ctx, dx, dy, TILE+1, 4, cTL, cTR, cBR, cBL); ctx.clip(); clipped=true;
+        }
         drawBodyTile(ctx, t, tx, ty, dx, dy);
         const mask = (oU?1:0)|(oR?2:0)|(oD?4:0)|(oL?8:0);
         if(mask) drawEdgeTile(ctx, mask, dx, dy);
+        if(clipped) ctx.restore();
         if(def.top && oU) drawGrassOverhang(t, def, sx, sy, tx, ty); // surface tufts/flowers
       } else {
         // Legacy runtime detail for the few non-atlas tiles (leaves + furniture).
@@ -389,7 +437,7 @@ export function render(){
           const surfY = world.surface[tx];
           if(ty > surfY+1){ ctx.fillStyle = (ty-surfY)<9 ? '#3f2c1a' : '#2f2f38'; ctx.fillRect(sx,sy,TILE+1,TILE+1); }
           ctx.save();
-          roundTilePath(ctx, sx, sy, TILE+1, 5, cTL, cTR, cBR, cBL);
+          roundTilePath(ctx, sx, sy, TILE+1, 6, cTL, cTR, cBR, cBL); // leaves/furniture: softer, less-square corners
           ctx.clip();
           clipped = true;
         }

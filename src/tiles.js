@@ -1,7 +1,7 @@
 import { AIR, DIRT, GRASS, STONE, WOODT, LEAF, COAL, IRON, GOLD,
          THORIUM, BEDROCK, BRICK, BRICKGLOW, CHEST, ALTAR,
          TORCH, CRAFT_TABLE, FURNACE, SAND, DUNGFLOOR, CLOUD, SKYBRICK, LADDER, VINE,
-         SNOW, ICE, CACTUS, JUNGLEGRASS, TREEWOOD } from './constants.js';
+         SNOW, ICE, CACTUS, JUNGLEGRASS, TREEWOOD, WATER, DRIPSTONE, MOSS, GLOWSHROOM } from './constants.js';
 
 export const TILES = {
   [AIR]:      { name:'Air', solid:false },
@@ -33,6 +33,10 @@ export const TILES = {
   [CACTUS]:   { name:'Cactus', color:'#4b8a3a', hardness:0.8, tier:0, solid:true, drop:'wood' },
   [JUNGLEGRASS]:{ name:'Jungle Grass', color:'#3f8a2c', top:'#2f6d1f', hardness:1, tier:0, solid:true, drop:'dirt' },
   [TREEWOOD]: { name:'Wood', color:'#8a5a2b', hardness:2.8, tier:0, solid:true, drop:'wood' }, // tree trunk (slow to chop, collapses)
+  [WATER]:    { name:'Water', color:'#2e6ebe', solid:false, drop:null, liquid:true },
+  [DRIPSTONE]:{ name:'Dripstone', color:'#6f6a63', solid:false, drop:null },       // cave spike décor
+  [MOSS]:     { name:'Mossy Stone', color:'#5c7d4a', hardness:2.2, tier:0, solid:true, drop:'stone' },
+  [GLOWSHROOM]:{ name:'Glowing Mushroom', color:'#6fe0c8', solid:false, drop:null, glow:'#7fffe0', light:true },
 };
 
 export const ITEMS = {

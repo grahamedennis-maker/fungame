@@ -12,4 +12,5 @@ export const AIR=0, DIRT=1, GRASS=2, STONE=3, WOODT=4, LEAF=5, COAL=6, IRON=7, G
       TORCH=15, CRAFT_TABLE=16, FURNACE=17, SAND=18, DUNGFLOOR=19,
       CLOUD=20, SKYBRICK=21, LADDER=22, VINE=23,
       SNOW=24, ICE=25, CACTUS=26, JUNGLEGRASS=27,
-      TREEWOOD=28; // natural tree trunk — collapses when chopped (placed wood = WOODT, does not)
+      TREEWOOD=28, // natural tree trunk — collapses when chopped (placed wood = WOODT, does not)
+      WATER=29, DRIPSTONE=30, MOSS=31, GLOWSHROOM=32; // cave biomes: swimmable water, dripstone, lush moss/glow
