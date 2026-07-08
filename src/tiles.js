@@ -82,19 +82,6 @@ export const ITEMS = {
   fire_sword:  { name:'Emberbrand', color:'#ff6a2c', stack:1, tool:'sword', dmg:30, range:34, glow:true, legendary:true, special:'magma' },
   tempest_bow: { name:'Tempest Bow', color:'#8fe0ff', stack:1, tool:'bow', dmg:22, range:260, glow:true, legendary:true, special:'volley' },
 
-  // ---- ELEMENTAL WANDS (craft from cores) — shoot bolts at the cursor + a special ----
-  fire_wand:   { name:'Fire Wand', color:'#ff6a2c', stack:1, tool:'wand', dmg:12, range:200, glow:true, special:'magma', bolt:'#ff7a2c', fiery:true },
-  water_wand:  { name:'Water Wand', color:'#3fb6ff', stack:1, tool:'wand', dmg:11, range:200, glow:true, special:'wave', bolt:'#6fd0ff' },
-  lightning_wand:{ name:'Lightning Wand', color:'#bfe8ff', stack:1, tool:'wand', dmg:14, range:210, glow:true, special:'lightning', bolt:'#e8faff' },
-
   // ---- TNT: throw it (right-click), short fuse, blasts tiles + mobs ----
   tnt:         { name:'TNT', color:'#c23a2a', stack:99, throwable:true },
-
-  // ---- WHIPS: long-range melee that double as a grapple hook (special yanks
-  // you toward whatever you aim at, up to 10 blocks). Elemental variants also
-  // apply a status effect on hit. ----
-  whip:          { name:'Whip', color:'#8a5a2b', stack:1, tool:'whip', dmg:14, range:66, special:'grapple', specialCd:1200 },
-  fire_whip:     { name:'Flame Whip', color:'#ff6a2c', stack:1, tool:'whip', dmg:16, range:66, glow:true, status:'burn', special:'grapple', specialCd:1200 },
-  ice_whip:      { name:'Frost Whip', color:'#8fe0ff', stack:1, tool:'whip', dmg:15, range:66, glow:true, status:'freeze', special:'grapple', specialCd:1200 },
-  lightning_whip:{ name:'Shock Whip', color:'#e8faff', stack:1, tool:'whip', dmg:17, range:66, glow:true, status:'shock', special:'grapple', specialCd:1200 },
 };

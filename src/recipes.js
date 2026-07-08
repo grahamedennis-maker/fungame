@@ -28,15 +28,4 @@ export const RECIPES = [
   { out:'water_trident',  n:1, station:'table', req:{frost_core:2,thorium_bar:3,gold_bar:2} },
   { out:'fire_sword',     n:1, station:'table', req:{ember_core:2,thorium_bar:3,gold_bar:2} },
   { out:'tempest_bow',    n:1, station:'table', req:{storm_core:2,thunder_shard:3,gold_bar:2} },
-
-  // ---- ELEMENTAL WANDS: craft from elemental cores ----
-  { out:'fire_wand',      n:1, station:'table', req:{ember_core:3,gold_bar:1} },
-  { out:'water_wand',     n:1, station:'table', req:{frost_core:3,gold_bar:1} },
-  { out:'lightning_wand', n:1, station:'table', req:{storm_core:3,gold_bar:1} },
-
-  // ---- WHIPS: base grapple whip from wood, elemental whips add a core ----
-  { out:'whip',           n:1, station:'table', req:{wood:6} },
-  { out:'fire_whip',      n:1, station:'table', req:{whip:1,ember_core:3} },
-  { out:'ice_whip',       n:1, station:'table', req:{whip:1,frost_core:3} },
-  { out:'lightning_whip', n:1, station:'table', req:{whip:1,storm_core:3} },
 ];

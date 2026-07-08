@@ -1,4 +1,5 @@
 import { state, world, setWorld } from './state.js';
+import { ITEMS } from './tiles.js';
 
 const SAVE_KEY = 'deepcrag-save-v4';
 const SAVE_VERSION = 4;
@@ -82,7 +83,9 @@ export function loadGame(){
     relics: data.world.relics || [],
   });
   state.player = data.player;
-  state.inv = data.inv;
+  // Drop any items that no longer exist in this build (e.g. removed weapons) so
+  // stale saves can't crash the inventory/hotbar UI on render.
+  state.inv = Array.isArray(data.inv) ? data.inv.map(s => (s && ITEMS[s.id]) ? s : null) : [];
   state.hotbarSel = data.hotbarSel;
   state.time = data.time;
   state.bossDefeated = data.bossDefeated;

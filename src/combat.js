@@ -1,5 +1,5 @@
 import { TILE, REACH, AIR, ALTAR, COAL, IRON, GOLD, THORIUM, WORLD_H, BEDROCK,
-         STONE, GRASS, WOODT, LEAF, JUNGLEGRASS } from './constants.js';
+         WOODT, LEAF } from './constants.js';
 import { clamp, ri, chance } from './utils.js';
 import { state, world } from './state.js';
 import { tileAt, setTile, tileDef, tileSolid } from './worldgen.js';
@@ -56,33 +56,6 @@ export function doAttack(){
     state.projectiles.push({ x:p.x+p.w/2, y:p.y+p.h/2, vx: p.facing*7, vy:-1, life:1800, from:'player', dmg });
     return;
   }
-  if(tool && tool.tool==='wand'){
-    // fire a straight magic bolt toward the cursor (no ammo)
-    const p = state.player;
-    const w = screenToWorld(state.mouse.x, state.mouse.y);
-    const ang = Math.atan2(w.y-(p.y+p.h/2), w.x-(p.x+p.w/2));
-    state.projectiles.push({ x:p.x+p.w/2, y:p.y+p.h/2, vx:Math.cos(ang)*6.5, vy:Math.sin(ang)*6.5,
-      life:1300, from:'player', dmg, color:tool.bolt||'#fff', fiery:!!tool.fiery, straight:true });
-    return;
-  }
-  if(tool && tool.tool==='whip'){
-    // long-range lash: hits every mob in a wide arc in front, applies status
-    const p = state.player, reach = tool.range||60;
-    const pcx = p.x+p.w/2, pcy = p.y+p.h/2;
-    for(const m of state.mobs){
-      const ddx = (m.x+m.w/2)-pcx, ddy = (m.y+m.h/2)-pcy;
-      if(Math.abs(ddx)<=reach && Math.abs(ddy)<=44 && ddx*p.facing>=-12){
-        m.hp -= dmg; m.vx += p.facing*3.5;
-        applyStatus(m, tool.status);
-        spawnParticles(m.x+m.w/2, m.y+m.h/2, tool.color||'#fff', 5);
-      }
-    }
-    if(state.boss){
-      const b=state.boss, ddx=(b.x+b.w/2)-pcx, ddy=(b.y+b.h/2)-pcy;
-      if(Math.abs(ddx)<=reach+20 && Math.abs(ddy)<=52) hitBoss(dmg);
-    }
-    return;
-  }
   const target = tryMob();
   if(target){ target.hp -= dmg; spawnParticles(target.x+target.w/2,target.y+target.h/2,'#fff',4); }
   if(state.boss){
@@ -109,14 +82,6 @@ export function useConsumable(){
     return true;
   }
   return false;
-}
-
-// Apply an elemental status effect to a mob (from whips).
-export function applyStatus(m, status){
-  if(!status) return;
-  if(status==='burn')   m.burn   = Math.max(m.burn||0, 2000);
-  else if(status==='freeze') m.freeze = Math.max(m.freeze||0, 2200);
-  else if(status==='shock')  m.shock  = Math.max(m.shock||0, 1600);
 }
 
 /* ---------- LEGENDARY SPECIAL ATTACKS ---------- */
@@ -149,22 +114,6 @@ export function doSpecial(){
   if(!specialReady()) return;
   const p = state.player;
   const pcx = p.x+p.w/2, pcy = p.y+p.h/2;
-
-  // A grapple needs a solid anchor under the cursor — you can only hook onto
-  // STONE, GRASS or WOOD, and within 10 blocks. Validate BEFORE spending the
-  // cooldown so a bad aim doesn't waste it.
-  let grappleTarget = null;
-  if(tool.special==='grapple'){
-    const w = screenToWorld(state.mouse.x, state.mouse.y);
-    const tx = Math.floor(w.x/TILE), ty = Math.floor(w.y/TILE);
-    const t = tileAt(tx,ty);
-    if(t!==STONE && t!==GRASS && t!==WOODT && t!==JUNGLEGRASS){
-      msg('Aim at stone, grass or wood to grapple'); return;
-    }
-    const targetX = tx*TILE+TILE/2, targetY = ty*TILE+TILE/2;
-    if(Math.hypot(targetX-pcx, targetY-pcy) > 10.6*TILE){ msg('Too far to grapple'); return; }
-    grappleTarget = { targetX, targetY };
-  }
 
   state.specialCd = performance.now();
   state.swingStart = performance.now();
@@ -248,26 +197,13 @@ export function doSpecial(){
     for(let i=0;i<34;i++) spawnParticles(pcx, gy, i%3?'#e8faff':'#9fb8e8', 1);
     state.flashes.push({ color:'rgba(210,220,255,0.4)', life:200 });
     msg('🔨 GROUND SLAM!');
-  } else if(tool.special==='grapple'){
-    // Whip grapple: hook the block under the cursor and YANK yourself to it.
-    const { targetX, targetY } = grappleTarget;
-    const ang = Math.atan2(targetY-pcy, targetX-pcx);
-    const dist = Math.max(TILE, Math.hypot(targetX-pcx, targetY-pcy) - TILE*0.6); // stop just short
-    const speed = 16;
-    p.dashVX = Math.cos(ang)*speed;
-    p.dashVY = Math.sin(ang)*speed;
-    p.dashT  = Math.max(60, (dist/speed)*16.7);
-    p.grappleAX = targetX; p.grappleAY = targetY;
-    p.grappleT  = p.dashT + 140;
-    for(let d=0; d<dist; d+=10) spawnParticles(pcx+Math.cos(ang)*d, pcy+Math.sin(ang)*d, '#e8dca0', 1);
-    msg('🪝 Grapple!');
   }
 }
 
 export function updateMining(dt){
   const mel = document.getElementById('mining');
   const tool = currentTool();
-  // Only pickaxes mine — weapons (swords, whips, wands, bows, hammers) never do.
+  // Only pickaxes mine — weapons (swords, bows, hammers) never do.
   if(!tool || tool.tool!=='pick'){ state.mining=null; mel.style.display='none'; return; }
 
   // Cursor-driven: mine whatever block is under the cursor right now, so you can

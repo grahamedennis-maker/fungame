@@ -55,21 +55,6 @@ export function moveEntity(e, dt){
 
 export function updatePlayer(dt){
   const p = state.player;
-  if(p.grappleT>0) p.grappleT -= dt*16.7; // chain visual timer
-
-  // Grapple dash (from the grapple whip): momentum-controlled yank toward a
-  // target; overrides normal input until it expires or hits something.
-  if(p.dashT>0){
-    p.dashT -= dt*16.7;
-    p.vx = p.dashVX; p.vy = p.dashVY; p.climbing = false;
-    const bx=p.x, by=p.y;
-    moveEntity(p, dt);
-    if(p.x===bx && p.y===by) p.dashT = 0; // slammed into something, stop
-    p.x = clamp(p.x, 0, WORLD_W*TILE-p.w);
-    if(p.hurtCd>0) p.hurtCd -= dt*16.7;
-    if(p.invuln>0) p.invuln -= dt*16.7;
-    return;
-  }
 
   let ax = 0;
   if(state.keys['a']||state.keys['arrowleft']){ ax=-1; p.facing=-1; }

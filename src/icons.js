@@ -83,45 +83,6 @@ function sword(ctx,color,size){
   ctx.fillRect(size*0.43,size*0.64,size*0.14,size*0.3);
 }
 
-function whip(ctx,color,size){
-  // wrapped leather handle with a pommel
-  ctx.fillStyle = '#5a3d22';
-  ctx.fillRect(size*0.12,size*0.18,size*0.15,size*0.34);
-  ctx.fillStyle = '#38260f';
-  for(let i=0;i<3;i++) ctx.fillRect(size*0.12, size*(0.24+i*0.085), size*0.15, size*0.03);
-  ctx.fillStyle = '#caa24a';
-  ctx.fillRect(size*0.10,size*0.15,size*0.19,size*0.045); // guard
-  // coiling lash, tapering to a fine tip
-  ctx.strokeStyle = color; ctx.lineWidth = Math.max(1.5,size*0.085); ctx.lineCap='round';
-  ctx.beginPath();
-  ctx.moveTo(size*0.25,size*0.30);
-  ctx.bezierCurveTo(size*0.74,size*0.16, size*0.86,size*0.52, size*0.58,size*0.62);
-  ctx.bezierCurveTo(size*0.40,size*0.70, size*0.50,size*0.90, size*0.80,size*0.86);
-  ctx.stroke();
-  ctx.lineWidth = Math.max(1,size*0.035);
-  ctx.beginPath(); ctx.moveTo(size*0.80,size*0.86); ctx.lineTo(size*0.93,size*0.91); ctx.stroke();
-  ctx.lineCap='butt';
-}
-
-function wand(ctx,color,size){
-  // wooden shaft
-  ctx.strokeStyle = '#6e4a28'; ctx.lineWidth = Math.max(2,size*0.09); ctx.lineCap='round';
-  ctx.beginPath(); ctx.moveTo(size*0.24,size*0.86); ctx.lineTo(size*0.62,size*0.34); ctx.stroke();
-  ctx.strokeStyle = shade('#6e4a28',24); ctx.lineWidth = Math.max(1,size*0.03);
-  ctx.beginPath(); ctx.moveTo(size*0.26,size*0.84); ctx.lineTo(size*0.6,size*0.36); ctx.stroke();
-  ctx.lineCap='butt';
-  // gold binding below the tip
-  ctx.strokeStyle='#e8c05a'; ctx.lineWidth=Math.max(1,size*0.045);
-  ctx.beginPath(); ctx.moveTo(size*0.53,size*0.44); ctx.lineTo(size*0.67,size*0.34); ctx.stroke();
-  // glowing elemental orb at the tip
-  const cx=size*0.68, cy=size*0.24, r=size*0.16;
-  const g=ctx.createRadialGradient(cx,cy,1,cx,cy,r*1.7);
-  g.addColorStop(0, shade(color,90)); g.addColorStop(0.5,color); g.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,r*1.7,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle=color; ctx.beginPath(); ctx.arc(cx,cy,r*0.75,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle=shade(color,95); ctx.beginPath(); ctx.arc(cx-r*0.28,cy-r*0.28,r*0.24,0,Math.PI*2); ctx.fill();
-}
-
 function trident(ctx,color,size){
   ctx.strokeStyle = '#8a6a3c'; ctx.lineWidth = Math.max(1,size*0.06);
   ctx.beginPath(); ctx.moveTo(size*0.5,size*0.42); ctx.lineTo(size*0.5,size*0.95); ctx.stroke();
@@ -263,8 +224,6 @@ function pick(id, def){
   if(def.tool==='sword') return sword;
   if(def.tool==='bow') return bow;
   if(def.tool==='hammer') return hammer;
-  if(def.tool==='wand') return wand;
-  if(def.tool==='whip') return whip;
   if(id.endsWith('_bar')) return bar;
   if(id.endsWith('_ore') || id==='coal') return ore;
   if(def.glow) return gem;

@@ -58,36 +58,6 @@ function roundTilePath(g, x, y, s, r, tl, tr, br, bl){
   g.closePath();
 }
 
-function drawWhipCrack(p, psx, psy){
-  const held = hotbarItem();
-  const def = held && ITEMS[held.id];
-  if(!def || def.tool!=='whip') return;
-  const t = (performance.now() - state.swingStart)/220;
-  if(t<0 || t>1) return;
-  const reach = def.range||60;
-  const ext = Math.sin(t*Math.PI);          // 0 → 1 → 0 extension envelope
-  const hx = psx + p.w/2, hy = psy + p.h*0.42;
-  const col = def.color || '#c9a86a';
-  const bow = 22*(1-t);                      // arcs high early, cracks flat late
-  ctx.strokeStyle = col; ctx.lineCap='round';
-  let px=hx, py=hy;
-  const N=12;
-  for(let i=1;i<=N;i++){
-    const f=i/N;
-    const nx = hx + p.facing*reach*ext*f;
-    const ny = hy - Math.sin(f*Math.PI)*bow + f*f*14*t; // rise, then whip forward-down
-    ctx.lineWidth = 3.6*(1-f)+0.6;          // tapered: thick handle → thin tip
-    ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(nx,ny); ctx.stroke();
-    px=nx; py=ny;
-  }
-  ctx.lineCap='butt'; ctx.lineWidth=1;
-  if(ext>0.6){ // bright crack at the tip
-    ctx.fillStyle = def.glow ? '#ffffff' : '#ffe6a0';
-    ctx.beginPath(); ctx.arc(px,py,3.4,0,Math.PI*2); ctx.fill();
-    if(def.glow){ ctx.globalAlpha=0.5; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(px,py,7,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1; }
-  }
-}
-
 const SWING_DUR = 240;
 // Terraria-style overhead melee sweep, expressed as the icon's rotation (the
 // upright icon points straight up = 0). The blade winds up behind the head and
@@ -95,7 +65,6 @@ const SWING_DUR = 240;
 const SWING_START = -0.63;   // up-and-back
 const SWING_END   =  2.37;   // down-and-front  (≈ 172° arc)
 const SWING_REST  =  0.40;   // idle ready pose (blade up, slightly forward)
-const MELEE_TOOLS = new Set(['sword','hammer','pick']);
 
 // The bright crescent smear that follows the blade through its arc — the
 // signature Terraria "slash". Drawn in the hand's (facing-flipped) frame as a
@@ -132,28 +101,15 @@ function drawHeldTool(p, psx, psy){
   const size = 22;
   const handX = psx + p.w/2 + p.facing*4, handY = psy + p.h*0.44;
 
-  // Bow / wand: aim the weapon toward the cursor with a short recoil kick,
+  // Bow: aim the weapon toward the cursor with a short recoil kick,
   // instead of an overhead swing.
-  if(tool==='bow' || tool==='wand'){
+  if(tool==='bow'){
     const ang = Math.atan2(state.mouse.y - handY, state.mouse.x - handX);
     const kick = active ? Math.sin(t*Math.PI)*3 : 0;
     ctx.save();
     ctx.translate(handX - Math.cos(ang)*kick, handY - Math.sin(ang)*kick);
     ctx.rotate(ang + Math.PI/2);           // icon points up at 0 -> align to aim
     ctx.translate(-size*0.5, -size*0.62);
-    drawItemIcon(ctx, held.id, size);
-    ctx.restore();
-    return;
-  }
-
-  // Whip: the animated lash (drawWhipCrack) is the real motion; just hold the
-  // handle in a ready pose so it doesn't double up with a sword-style swing.
-  if(tool==='whip'){
-    ctx.save();
-    ctx.translate(handX,handY);
-    if(p.facing<0) ctx.scale(-1,1);
-    ctx.rotate(SWING_REST);
-    ctx.translate(-size*0.5,-size*0.82);
     drawItemIcon(ctx, held.id, size);
     ctx.restore();
     return;
@@ -589,17 +545,6 @@ export function render(){
   ctx.fillRect(psx,psy+p.h-8,p.w,8);
   ctx.globalAlpha=1;
   drawHeldTool(p, psx, psy);
-  drawWhipCrack(p, psx, psy);
-  // grapple chain from the player to the hook anchor while yanking
-  if(p.grappleT>0 && p.grappleAX!=null){
-    ctx.strokeStyle='#c9b06a'; ctx.lineWidth=2;
-    ctx.beginPath();
-    ctx.moveTo(psx+p.w/2, psy+p.h*0.4);
-    ctx.lineTo(p.grappleAX-state.camX, p.grappleAY-state.camY);
-    ctx.stroke(); ctx.lineWidth=1;
-    ctx.fillStyle='#e8dca0';
-    ctx.fillRect(p.grappleAX-state.camX-3, p.grappleAY-state.camY-3, 6, 6); // hook
-  }
 
   // darkness overlay when underground (lit by player + torches)
   if(underground){
