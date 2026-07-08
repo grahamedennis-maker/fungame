@@ -77,7 +77,7 @@ export const ITEMS = {
   storm_maul:  { name:'Stormcaller Maul', color:'#a9d8ff', stack:1, tool:'hammer', dmg:24, range:38, glow:true, enhanced:true, special:'lightning' },
 
   // ---- LEGENDARIES (boss drops / shop / craft) — each has a `special` power ----
-  thunder_hammer:{ name:"Thor's Hammer", color:'#8fe8ff', stack:1, tool:'hammer', dmg:34, range:42, glow:true, arc:true, legendary:true, special:'slam', specialCd:8000 },
+  thunder_hammer:{ name:"Thor's Hammer", color:'#8fe8ff', stack:1, tool:'hammer', dmg:34, range:42, glow:true, legendary:true, special:'slam', specialCd:8000 },
   water_trident:{ name:'Tide Trident', color:'#3fb6ff', stack:1, tool:'sword', dmg:26, range:40, glow:true, legendary:true, special:'wave' },
   fire_sword:  { name:'Emberbrand', color:'#ff6a2c', stack:1, tool:'sword', dmg:30, range:34, glow:true, legendary:true, special:'magma' },
   tempest_bow: { name:'Tempest Bow', color:'#8fe0ff', stack:1, tool:'bow', dmg:22, range:260, glow:true, legendary:true, special:'volley' },

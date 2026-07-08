@@ -5,6 +5,7 @@ import { clamp } from './utils.js';
 import { state, world } from './state.js';
 import { canCraft, doCraft, countItem, addItem, removeItem } from './inventory.js';
 import { isNight } from './mobs.js';
+import { SPECIAL_CD } from './combat.js';
 import { iconEl } from './icons.js';
 
 /* ---------- MESSAGES ---------- */
@@ -170,7 +171,6 @@ export function renderInvUI(){
 }
 
 /* ---------- HUD TEXT UPDATE ---------- */
-const SPECIAL_CD = 4500;
 export function updateHUD(){
   const p = state.player;
   document.getElementById('hpfill').style.width = clamp(100*p.hp/p.maxhp,0,100)+'%';

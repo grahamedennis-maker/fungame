@@ -1,6 +1,7 @@
 import { state, world, setWorld } from './state.js';
 
 const SAVE_KEY = 'deepcrag-save-v4';
+const SAVE_VERSION = 4;
 
 export function hasSave(){
   try { return !!localStorage.getItem(SAVE_KEY); } catch { return false; }
@@ -40,7 +41,7 @@ function decodeGrid(enc){
 export function saveGame(){
   if(!world || !state.player) return;
   const data = {
-    version: 3,
+    version: SAVE_VERSION,
     world: {
       grid: encodeGrid(world.grid),
       surface: world.surface,
@@ -68,6 +69,9 @@ export function loadGame(){
   let data;
   try { data = JSON.parse(raw); } catch { return null; }
   if(!data.world || !data.world.grid || !data.world.grid.rle) return null;
+  // Reject saves written by a newer build than we know how to read; older/missing
+  // versions stay loadable (the structural checks above catch real corruption).
+  if(typeof data.version === 'number' && data.version > SAVE_VERSION) return null;
   setWorld({
     grid: decodeGrid(data.world.grid),
     surface: data.world.surface,

@@ -85,6 +85,7 @@ export function defeatBoss(){
   if(legendary) msg('You obtained a legendary weapon!');
   spawnParticles(b.x+b.w/2,b.y+b.h/2,'#ffd700',30);
   state.boss = null;
+  state.bossDefeated = true;
   state.bossCooldown = 20000;
   document.getElementById('bosshud').style.display='none';
 }
