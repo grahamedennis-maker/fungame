@@ -482,6 +482,20 @@ export function render(){
     }
   }
 
+  // mining cracks on partially-broken blocks (swing-collision damage)
+  if(state.mineHits) for(const [k,prog] of state.mineHits){
+    const c = k.indexOf(','); const tx=+k.slice(0,c), ty=+k.slice(c+1);
+    if(tx<x0||tx>x1||ty<y0||ty>y1) continue;
+    const sx=tx*TILE-state.camX, sy=ty*TILE-state.camY;
+    const a=clamp(prog/22,0.18,0.85);
+    ctx.strokeStyle=`rgba(15,10,8,${a})`; ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(sx+3,sy+2); ctx.lineTo(sx+7,sy+7); ctx.lineTo(sx+5,sy+13);
+    ctx.moveTo(sx+12,sy+3); ctx.lineTo(sx+9,sy+8); ctx.lineTo(sx+13,sy+14);
+    if(prog>10){ ctx.moveTo(sx+2,sy+9); ctx.lineTo(sx+8,sy+11); }
+    ctx.stroke();
+  }
+
   // torches light glow (from the list gathered in the tile pass)
   for(const L of torchLights) drawGlow(ctx, 'rgba(255,180,80,0.35)', 70, L.x, L.y, 2);
 

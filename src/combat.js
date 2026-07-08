@@ -247,44 +247,59 @@ export function doSpecial(){
   }
 }
 
-export function updateMining(dt){
-  const mel = document.getElementById('mining');
-  const tool = currentTool();
-  // Only pickaxes mine — weapons (swords, bows, hammers) never do.
-  if(!tool || tool.tool!=='pick'){ state.mining=null; mel.style.display='none'; return; }
+const MINE_SWING = 240; // ms per pickaxe swing (matches the visual swing)
 
-  // Cursor-driven: mine whatever block is under the cursor right now, so you can
-  // just hold the button and drag across blocks instead of clicking each one.
-  const w = screenToWorld(state.mouse.x, state.mouse.y);
-  const tx = Math.floor(w.x/TILE), ty = Math.floor(w.y/TILE);
-  const t = tileAt(tx,ty);
-  const def = tileDef(t);
-  if(t===AIR || t===undefined || def.isAltar || def.isChest || !reachOk(tx,ty)){
-    state.mining=null; mel.style.display='none'; return;
-  }
-  if(def.tier>0 && tool.tier<def.tier){
-    mel.style.display='none'; state.mining=null; return; // need a better pickaxe
-  }
-  // (re)target when the cursor moves to a different block
-  if(!state.mining || state.mining.tx!==tx || state.mining.ty!==ty){
-    state.mining = { tx, ty, progress:0 };
-  }
-  const now = performance.now();
-  if(now - state.swingStart > 260) state.swingStart = now; // keep the pick swinging
-
-  state.mining.progress += tool.power*dt*1.8;
+// Chip one block: accrue swing damage, break it (and drop/collapse) when done.
+function strikeTile(tx, ty, tool, hx, hy){
+  const t = tileAt(tx,ty), def = tileDef(t);
+  if(t===AIR || t===undefined || def.isAltar || def.isChest || !def.solid) return;
+  if(!reachOk(tx,ty)) return;
+  if(def.tier>0 && tool.tier<def.tier) return; // need a stronger pickaxe
+  const key = tx+','+ty;
   const need = def.hardness*15;
-  mel.style.display='block';
-  const sx = tx*TILE - state.camX, sy = ty*TILE - state.camY;
-  mel.style.left = (sx-5)+'px'; mel.style.top = (sy-10)+'px';
-  document.getElementById('miningfill').style.width = clamp(100*state.mining.progress/need,0,100)+'%';
-  if(state.mining.progress>=need){
+  const prog = (state.mineHits.get(key)||0) + tool.power*dt_cache*2.6;
+  if(prog>=need){
     if(def.drop) addItem(def.drop,1);
     if(t===COAL||t===IRON||t===GOLD||t===THORIUM) msg('Found '+def.name+'!');
     setTile(tx,ty,AIR);
     dislodgeAbove(tx,ty); // tree wood/leaves above lose support and fall
-    state.mining=null; // next frame retargets the block now under the cursor
+    state.mineHits.delete(key);
+    spawnParticles(tx*TILE+8, ty*TILE+8, def.color, 8);
+  } else {
+    state.mineHits.set(key, prog);
+    if(chance(0.4)) spawnParticles(hx, hy, def.color, 1);
   }
+}
+
+let dt_cache = 1;
+// Swing-collision mining: with a pickaxe held, the tool swings toward the cursor
+// and breaks whatever blocks the arc sweeps through — the aimed block plus the
+// block under the swinging pick-head as it arcs. Blocks accumulate damage across
+// swings (harder tiles take more), and untouched blocks slowly heal.
+export function updateMining(dt){
+  document.getElementById('mining').style.display='none'; // legacy bar unused
+  const tool = currentTool();
+  if(!tool || tool.tool!=='pick'){ if(state.mineHits) state.mineHits.clear(); return; }
+  if(!state.mineHits) state.mineHits = new Map();
+  dt_cache = dt;
+
+  const p = state.player;
+  const handX = p.x+p.w/2, handY = p.y+p.h*0.44;
+  const cwx = state.mouse.x+state.camX, cwy = state.mouse.y+state.camY;
+  const aim = Math.atan2(cwy-handY, cwx-handX);
+  const dist = clamp(Math.hypot(cwx-handX, cwy-handY), TILE, REACH*TILE);
+  const t = clamp((performance.now()-state.swingStart)/MINE_SWING, 0, 1);
+  const sweep = aim + (-0.6 + 1.2*t);         // the pick-head arcs across the aim as it swings
+  const headX = handX + Math.cos(sweep)*dist, headY = handY + Math.sin(sweep)*dist;
+
+  // the block you're pointing at (precise aim always works) + the swept pick-head
+  strikeTile(Math.floor(cwx/TILE), Math.floor(cwy/TILE), tool, cwx, cwy);
+  strikeTile(Math.floor(headX/TILE), Math.floor(headY/TILE), tool, headX, headY);
+
+  const now = performance.now();
+  if(now - state.swingStart > MINE_SWING) state.swingStart = now; // keep swinging
+  // heal blocks that aren't currently being struck so progress doesn't linger
+  for(const [k,v] of state.mineHits){ const nv=v-dt*1.1; if(nv<=0) state.mineHits.delete(k); else state.mineHits.set(k,nv); }
 }
 
 /* ---------- FALLING BLOCKS (Terraria-style tree collapse) ---------- */

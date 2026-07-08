@@ -18,7 +18,8 @@ export const state = {
   hotbarSel:0,
   invOpen:false,
   settingsOpen:false,
-  mining:null, // {tx,ty,progress}
+  mining:null, // legacy (unused)
+  mineHits:new Map(), // "tx,ty" -> accumulated swing damage on partially-mined blocks
   torches:[], // {x,y} world tile coords for light
   keys:{},
   mouse:{x:0,y:0,down:false,button:0},

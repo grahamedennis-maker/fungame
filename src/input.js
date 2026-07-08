@@ -35,7 +35,7 @@ export function initInput(){
     state.mouse.down=true; state.mouse.button=e.button;
     handleClick(e.clientX,e.clientY,e.button);
   });
-  canvas.addEventListener('mouseup', ()=>{ state.mouse.down=false; state.mining=null; });
+  canvas.addEventListener('mouseup', ()=>{ state.mouse.down=false; state.mining=null; if(state.mineHits) state.mineHits.clear(); });
 }
 
 function handleClick(sx,sy,button){

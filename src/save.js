@@ -93,6 +93,7 @@ export function loadGame(){
   // transient runtime arrays never persist; start empty each load
   state.mobs = []; state.projectiles = []; state.particles = [];
   state.zaps = []; state.waves = []; state.flashes = []; state.bombs = []; state.falling = []; state.boss = null;
+  state.mineHits = new Map();
   return true;
 }
 
