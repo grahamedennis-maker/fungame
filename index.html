@@ -18,7 +18,9 @@
     <div id="bosshud"><div id="bossname">The Storm King</div><div id="bosshpbar"><div id="bosshpfill"></div></div></div>
     <div id="msglog"></div>
     <div id="mining"><div id="miningfill"></div></div>
+    <div id="inthint"></div>
     <div id="hotbar"></div>
+    <button id="specialbtn" title="Special attack (Q)"><span id="specialicon">✦</span><span id="speciallabel">Special</span></button>
     <div id="inv">
       <h2>Backpack &amp; Crafting</h2>
       <div style="font-size:12px;color:#aa9;margin-bottom:8px;">Click a backpack item to swap it into your selected hotbar slot (shown highlighted below and in the hotbar).</div>
@@ -29,6 +31,32 @@
       <div id="closehint">Press <span class="kbd">E</span> to close</div>
     </div>
     <div id="deathmsg">You were slain in the depths...<br><span style="font-size:16px;">Respawning at the surface</span></div>
+    <div id="itemtooltip"></div>
+    <div id="shop">
+      <h2>Sky Merchant</h2>
+      <div style="font-size:12px;color:#aa9;margin-bottom:8px;">Spend coins on supplies and rare gear. Sell nothing — just buy!</div>
+      <div id="shopcoins"></div>
+      <div id="shopgrid"></div>
+      <div class="closehint">Press <span class="kbd">Esc</span> to close</div>
+    </div>
+    <button id="settingsbtn" title="Controls (Esc)">&#9881;</button>
+    <div id="settings">
+      <h2>Controls</h2>
+      <div class="controls-list">
+        <div class="crow"><span class="kbd">A</span><span class="kbd">D</span><span class="clabel">Move left / right</span></div>
+        <div class="crow"><span class="kbd">Shift</span><span class="clabel">Sprint (hold)</span></div>
+        <div class="crow"><span class="kbd">Space</span><span class="clabel">Jump</span></div>
+        <div class="crow"><span class="kbd">W</span><span class="kbd">S</span><span class="clabel">Climb ladders / vines (up / down)</span></div>
+        <div class="crow"><span class="kbd">Left Click</span><span class="clabel">Hold to mine (pickaxe) / attack (weapon)</span></div>
+        <div class="crow"><span class="kbd">Right Click</span><span class="clabel">Place block · throw TNT · use altar/shop</span></div>
+        <div class="crow"><span class="kbd">Q</span><span class="clabel">Special attack (legendary / enhanced / wand)</span></div>
+        <div class="crow"><span class="kbd">1</span>&ndash;<span class="kbd">8</span><span class="clabel">Select hotbar slot</span></div>
+        <div class="crow"><span class="kbd">E</span><span class="clabel">Open / close Backpack &amp; Crafting</span></div>
+        <div class="crow"><span class="kbd">Esc</span><span class="clabel">Open / close this Controls menu</span></div>
+      </div>
+      <p class="chint">To craft: press <span class="kbd">E</span> to open your backpack, then click any recipe on the right. Greyed-out recipes need more materials (or a Crafting Table / Furnace nearby).</p>
+      <div class="closehint">Press <span class="kbd">Esc</span> to close</div>
+    </div>
   </div>
   <div id="titlecard">
     <h1>⛏ DEEPCRAG ⛏</h1>

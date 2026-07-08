@@ -1,19 +1,55 @@
 import { state, world, setWorld } from './state.js';
 
-const SAVE_KEY = 'deepcrag-save-v1';
+const SAVE_KEY = 'deepcrag-save-v4';
 
 export function hasSave(){
   try { return !!localStorage.getItem(SAVE_KEY); } catch { return false; }
 }
 
+// The grid is huge (up to ~10000 x 320 tiles), so store it run-length encoded.
+// The world is mostly long uniform stretches (air/stone), so RLE shrinks it to
+// a small fraction of the raw size — the difference between fitting in
+// localStorage and not.
+function encodeGrid(grid){
+  const h = grid.length, w = grid[0].length;
+  const rle = [];
+  let prev = grid[0][0], count = 0;
+  for(let y=0;y<h;y++){
+    const row = grid[y];
+    for(let x=0;x<w;x++){
+      const v = row[x];
+      if(v===prev) count++;
+      else { rle.push(prev, count); prev=v; count=1; }
+    }
+  }
+  rle.push(prev, count);
+  return { w, h, rle };
+}
+function decodeGrid(enc){
+  const { w, h, rle } = enc;
+  const grid = [];
+  for(let y=0;y<h;y++) grid.push(new Uint8Array(w));
+  let idx = 0;
+  for(let i=0;i<rle.length;i+=2){
+    const v = rle[i]; let c = rle[i+1];
+    while(c-- > 0){ grid[(idx/w)|0][idx%w] = v; idx++; }
+  }
+  return grid;
+}
+
 export function saveGame(){
   if(!world || !state.player) return;
   const data = {
-    version: 1,
+    version: 3,
     world: {
-      grid: world.grid.map(row => Array.from(row)),
+      grid: encodeGrid(world.grid),
       surface: world.surface,
-      dungeon: world.dungeon,
+      dungeons: world.dungeons,
+      caves: world.caves,
+      sky: world.sky,
+      villager: world.villager,
+      relics: world.relics,
+      // biomes intentionally omitted — not used at runtime
     },
     player: state.player,
     inv: state.inv,
@@ -22,18 +58,24 @@ export function saveGame(){
     bossDefeated: state.bossDefeated,
     bossCooldown: state.bossCooldown,
   };
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch { /* storage unavailable, skip */ }
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch { /* storage unavailable / quota, skip */ }
 }
 
 export function loadGame(){
   let raw;
   try { raw = localStorage.getItem(SAVE_KEY); } catch { return null; }
   if(!raw) return null;
-  const data = JSON.parse(raw);
+  let data;
+  try { data = JSON.parse(raw); } catch { return null; }
+  if(!data.world || !data.world.grid || !data.world.grid.rle) return null;
   setWorld({
-    grid: data.world.grid.map(row => Uint8Array.from(row)),
+    grid: decodeGrid(data.world.grid),
     surface: data.world.surface,
-    dungeon: data.world.dungeon,
+    dungeons: data.world.dungeons || [],
+    caves: data.world.caves || [],
+    sky: data.world.sky || null,
+    villager: data.world.villager || null,
+    relics: data.world.relics || [],
   });
   state.player = data.player;
   state.inv = data.inv;
@@ -41,6 +83,9 @@ export function loadGame(){
   state.time = data.time;
   state.bossDefeated = data.bossDefeated;
   state.bossCooldown = data.bossCooldown;
+  // transient runtime arrays never persist; start empty each load
+  state.mobs = []; state.projectiles = []; state.particles = [];
+  state.zaps = []; state.waves = []; state.flashes = []; state.bombs = []; state.boss = null;
   return true;
 }
 

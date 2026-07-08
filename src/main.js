@@ -3,7 +3,8 @@ import { state, setWorld } from './state.js';
 import { generateWorld, tileAt } from './worldgen.js';
 import { spawnPlayer, updatePlayer, damagePlayer } from './player.js';
 import { updateMobs, updateSpawning, spawnMob } from './mobs.js';
-import { updateProjectiles, updateMining } from './combat.js';
+import { updateProjectiles, updateMining, updateEffects, updateBombs, doAttack } from './combat.js';
+import { ITEMS } from './tiles.js';
 import { updateParticles } from './particles.js';
 import { updateBoss, spawnBoss } from './boss.js';
 import { addItem, countItem } from './inventory.js';
@@ -37,14 +38,21 @@ function loop(now){
   lastT = now;
   state.time += now - stepLast; stepLast = now;
 
-  if(!state.invOpen){
+  if(!state.invOpen && !state.settingsOpen && !state.shopOpen){
     updatePlayer(dt);
     updateMobs(dt);
     updateProjectiles(dt);
     updateParticles(dt);
+    updateEffects(dt);
+    updateBombs(dt);
     updateBoss(dt);
     updateSpawning(dt);
-    if(state.mouse.down && state.mouse.button===0) updateMining(dt);
+    if(state.mouse.down && state.mouse.button===0){
+      updateMining(dt); // mines only with a pickaxe (drag to mine)
+      const held = state.inv[state.hotbarSel];
+      const hd = held && ITEMS[held.id];
+      if(hd && hd.tool && hd.tool!=='pick') doAttack(); // weapons auto-swing while held
+    }
   }
   render();
   updateHUD();
@@ -74,6 +82,7 @@ function startGame(){
   state.inv.sort((a,b)=>{ if(a&&!b)return -1; if(!a&&b)return 1; return 0; });
   beginRunning();
   msg('Welcome to Deepcrag. Dig, craft, survive.');
+  msg('Press E to craft, Esc for controls.');
 }
 
 function continueGame(){

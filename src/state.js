@@ -17,10 +17,18 @@ export const state = {
   inv:[], // {id,count}
   hotbarSel:0,
   invOpen:false,
+  settingsOpen:false,
   mining:null, // {tx,ty,progress}
   torches:[], // {x,y} world tile coords for light
   keys:{},
   mouse:{x:0,y:0,down:false,button:0},
   lastAttack:0,
+  swingStart:0,
+  specialCd:-99999,
+  zaps:[],   // lightning bolt visuals {x,y0,y1,life}
+  waves:[],  // ring visuals {x,y,r,max,life,color}
+  flashes:[],// full-screen flash visuals {color,life}
+  bombs:[],  // live TNT {x,y,vx,vy,fuse}
+  shopOpen:false,
   msgTimer:0,
 };
