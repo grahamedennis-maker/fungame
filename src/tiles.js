@@ -7,7 +7,7 @@ import { AIR, DIRT, GRASS, STONE, WOODT, LEAF, COAL, IRON, GOLD,
 export const TILES = {
   [AIR]:      { name:'Air', solid:false },
   [DIRT]:     { name:'Dirt', color:'#6b4a2c', hardness:1, tier:0, solid:true, drop:'dirt' },
-  [GRASS]:    { name:'Grass', color:'#4f9e3f', top:'#3d7d31', hardness:1, tier:0, solid:true, drop:'dirt' },
+  [GRASS]:    { name:'Grass', color:'#4fa032', top:'#7bca4a', hardness:1, tier:0, solid:true, drop:'dirt' }, // bright Forest green
   [STONE]:    { name:'Stone', color:'#7d7d7d', hardness:2.2, tier:0, solid:true, drop:'stone' },
   [WOODT]:    { name:'Wood', color:'#8a5a2b', hardness:1.2, tier:0, solid:true, drop:'wood' },
   [LEAF]:     { name:'Leaves', color:'#2f7d32', hardness:0.4, tier:0, solid:false, drop:null },

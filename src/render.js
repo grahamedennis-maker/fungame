@@ -243,14 +243,18 @@ function drawGrassOverhang(t, def, sx, sy, tx, ty){
     const up = hh<0.32 ? 0 : (hh<0.72 ? 1 : 2); // 0-2px grass bumps
     if(up) ctx.fillRect(sx+i, sy-up, 2, up);
   }
-  const h = hash2(tx,ty), h2 = hash2(tx*3.1+7, ty*5.7+3);
-  ctx.fillStyle = shade(top,-25); // taller blades poking up
+  const h = hash2(tx,ty), h2 = hash2(tx*3.1+7, ty*5.7+3), h3 = hash2(tx*5+3, ty*2+9);
+  ctx.fillStyle = shade(top,-26); // grass blades poking up (varied heights)
   if(h>0.4) ctx.fillRect(sx+2+Math.floor(h*3), sy-4, 2, 4);
   if(h2>0.5) ctx.fillRect(sx+9+Math.floor(h2*4), sy-3, 2, 3);
-  if(t===GRASS && h*h2>0.66){ // wildflower
-    const fc = ['#e86a8a','#e8d24a','#8a6ae8'][Math.floor(h2*3)%3];
-    ctx.fillStyle = fc; ctx.fillRect(sx+5+Math.floor(h*5), sy-5, 2, 2);
-    ctx.fillStyle = '#ffe6a0'; ctx.fillRect(sx+6+Math.floor(h*5), sy-4, 1, 1);
+  if(h3>0.62) ctx.fillRect(sx+6+Math.floor(h3*4), sy-6, 1, 6); // occasional tall blade
+  if(t===GRASS && h*h2>0.5){ // lush forest wildflowers (varied colors, on a stem)
+    const cols=['#e8637f','#e8d24a','#8a6ae8','#f4f4f4','#e88a3c'];
+    const fc = cols[Math.floor(h3*997)%cols.length];
+    const fx = sx+4+Math.floor(h*7);
+    ctx.fillStyle = shade(top,-30); ctx.fillRect(fx, sy-4, 1, 4);          // stem
+    ctx.fillStyle = fc; ctx.fillRect(fx-1, sy-6, 3, 2); ctx.fillRect(fx, sy-7, 1, 3); // petals
+    ctx.fillStyle = '#ffe6a0'; ctx.fillRect(fx, sy-6, 1, 1);               // center
   }
 }
 
