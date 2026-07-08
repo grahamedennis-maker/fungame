@@ -59,16 +59,31 @@ export function generateWorld(W,H){
   // ---- FLORA (biome-aware) ----
   function placeTree(x, snowy){
     const sy = surface[x];
-    const th = ri(4,7);
+    const leaf = snowy ? SNOW : LEAF;
+    const th = ri(7,13); // tall Terraria-style trunk
     for(let i=1;i<=th;i++){ if(sy-i>0) grid[sy-i][x]=TREEWOOD; } // natural trunk (collapses when chopped)
-    const topY = sy-th, canopyR = ri(2,3);
-    for(let ly=-canopyR; ly<=canopyR-1; ly++) for(let lx=-canopyR; lx<=canopyR; lx++){
-      if(Math.abs(lx)+Math.abs(ly*1.3) <= canopyR+0.6){
-        const yy=topY+ly, xx=x+lx;
-        if(xx>=0&&xx<W&&yy>0&&yy<H && grid[yy][xx]===AIR) grid[yy][xx] = snowy ? SNOW : LEAF;
+    // little angled roots at the base
+    if(x-1>0 && grid[sy-1][x-1]===AIR) grid[sy-1][x-1]=TREEWOOD;
+    if(x+1<W && grid[sy-1][x+1]===AIR) grid[sy-1][x+1]=TREEWOOD;
+    // side branches with a small leaf "paw" at each tip, at a few mid-heights
+    for(let k=0, nB=ri(2,3); k<nB; k++){
+      const by = sy - ri(3, th-2), dir = chance(0.5)?-1:1, blen = ri(1,2);
+      for(let j=1;j<=blen;j++){ const bx=x+dir*j; if(bx>0&&bx<W&&by>0 && grid[by][bx]===AIR) grid[by][bx]=TREEWOOD; }
+      const tipx = x+dir*(blen+1);
+      for(let ly=-1;ly<=1;ly++) for(let lx=-1;lx<=1;lx++){
+        const xx=tipx+lx, yy=by+ly;
+        if(xx>0&&xx<W&&yy>0&&yy<H && grid[yy][xx]===AIR && Math.abs(lx)+Math.abs(ly)<=2) grid[yy][xx]=leaf;
       }
     }
-    if(topY-1>0 && grid[topY-1][x]===AIR) grid[topY-1][x] = snowy ? SNOW : LEAF;
+    // big rounded canopy crowning the trunk
+    const topY = sy-th, canopyR = ri(3,4);
+    for(let ly=-canopyR-1; ly<=canopyR-1; ly++) for(let lx=-canopyR; lx<=canopyR; lx++){
+      if(Math.hypot(lx,(ly+1)*1.15) <= canopyR+0.4){
+        const yy=topY+ly, xx=x+lx;
+        if(xx>=0&&xx<W&&yy>0&&yy<H && grid[yy][xx]===AIR) grid[yy][xx]=leaf;
+      }
+    }
+    if(topY-1>0 && grid[topY-1][x]===AIR) grid[topY-1][x]=leaf;
   }
   function placeCactus(x){
     const sy = surface[x], h = ri(2,4);
@@ -80,10 +95,10 @@ export function generateWorld(W,H){
     if(b==='desert'){
       if(x-lastTreeX>5 && chance(0.06)){ lastTreeX=x; placeCactus(x); }
     } else if(b==='snow'){
-      if(x-lastTreeX>4 && chance(0.12)){ lastTreeX=x; placeTree(x,true); }
+      if(x-lastTreeX>6 && chance(0.16)){ lastTreeX=x; placeTree(x,true); }
     } else {
-      const dens = b==='jungle' ? 0.30 : 0.16;
-      if(x-lastTreeX>3 && chance(dens)){ lastTreeX=x; placeTree(x,false); }
+      const dens = b==='jungle' ? 0.34 : 0.20;
+      if(x-lastTreeX>6 && chance(dens)){ lastTreeX=x; placeTree(x,false); }
       // hanging jungle vines
       if(b==='jungle' && chance(0.10)){
         const sy=surface[x], vl=ri(2,5);

@@ -410,8 +410,14 @@ export function render(){
         }
         const h = hash2(tx,ty), h2 = hash2(tx*3.1+7,ty*5.7+3);
         if(t===LEAF){
-          if((tx+ty*3)%3===0){ ctx.fillStyle='#3d9142'; ctx.fillRect(sx,sy,TILE+1,TILE+1); }
-          if(h>0.7){ ctx.fillStyle=shade(def.color,-25); ctx.fillRect(sx+4+Math.floor(h2*5),sy+4+Math.floor(h*5),3,3); }
+          // dappled foliage: color variation + darker clumps + light highlights + berries
+          if((tx+ty*3)%3===0){ ctx.fillStyle='#4aa64a'; ctx.fillRect(sx,sy,TILE+1,TILE+1); }
+          ctx.fillStyle = shade(def.color,-24);
+          ctx.fillRect(sx+2+Math.floor(h*4), sy+2+Math.floor(h2*4), 3,3);
+          ctx.fillRect(sx+9+Math.floor(h2*4), sy+8+Math.floor(h*4), 2,2);
+          ctx.fillStyle = shade(def.color,26);
+          ctx.fillRect(sx+3+Math.floor(h2*8), sy+3+Math.floor(h*8), 2,2);
+          if(h*h2>0.72){ ctx.fillStyle='#e05a6a'; ctx.fillRect(sx+6,sy+6,2,2); } // berry
         } else if(t===CRAFT_TABLE){
           ctx.fillStyle = shade(def.color,28);
           ctx.fillRect(sx+1,sy+1,TILE-1,3);

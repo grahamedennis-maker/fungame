@@ -285,15 +285,18 @@ export function updateMining(dt){
 
   const p = state.player;
   const handX = p.x+p.w/2, handY = p.y+p.h*0.44;
+  // Aim direction comes from the cursor, but the pick only reaches the blocks
+  // right NEXT TO the character — you can't mine a distant block through others.
   const cwx = state.mouse.x+state.camX, cwy = state.mouse.y+state.camY;
   const aim = Math.atan2(cwy-handY, cwx-handX);
-  const dist = clamp(Math.hypot(cwx-handX, cwy-handY), TILE, REACH*TILE);
   const t = clamp((performance.now()-state.swingStart)/MINE_SWING, 0, 1);
-  const sweep = aim + (-0.6 + 1.2*t);         // the pick-head arcs across the aim as it swings
-  const headX = handX + Math.cos(sweep)*dist, headY = handY + Math.sin(sweep)*dist;
+  const reach = TILE*1.6;                       // adjacent tiles only
+  const sweep = aim + (-0.5 + 1.0*t);           // the pick-head arcs across the aim as it swings
+  const headX = handX + Math.cos(sweep)*reach, headY = handY + Math.sin(sweep)*reach;
+  const aimX  = handX + Math.cos(aim)*reach,   aimY  = handY + Math.sin(aim)*reach;
 
-  // the block you're pointing at (precise aim always works) + the swept pick-head
-  strikeTile(Math.floor(cwx/TILE), Math.floor(cwy/TILE), tool, cwx, cwy);
+  // the adjacent block straight along the aim + the one the swept pick-head sweeps over
+  strikeTile(Math.floor(aimX/TILE),  Math.floor(aimY/TILE),  tool, aimX,  aimY);
   strikeTile(Math.floor(headX/TILE), Math.floor(headY/TILE), tool, headX, headY);
 
   const now = performance.now();
