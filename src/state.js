@@ -29,6 +29,7 @@ export const state = {
   waves:[],  // ring visuals {x,y,r,max,life,color}
   flashes:[],// full-screen flash visuals {color,life}
   bombs:[],  // live TNT {x,y,vx,vy,fuse}
+  falling:[],// live falling blocks {x,y,vy,tile} — dislodged tree wood/leaves
   shopOpen:false,
   msgTimer:0,
 };

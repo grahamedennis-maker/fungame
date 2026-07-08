@@ -8,7 +8,7 @@ export const TILES = {
   [DIRT]:     { name:'Dirt', color:'#6b4a2c', hardness:1, tier:0, solid:true, drop:'dirt' },
   [GRASS]:    { name:'Grass', color:'#4f9e3f', top:'#3d7d31', hardness:1, tier:0, solid:true, drop:'dirt' },
   [STONE]:    { name:'Stone', color:'#7d7d7d', hardness:2.2, tier:0, solid:true, drop:'stone' },
-  [WOODT]:    { name:'Wood', color:'#8a5a2b', hardness:1.2, tier:0, solid:true, drop:'wood' },
+  [WOODT]:    { name:'Wood', color:'#8a5a2b', hardness:2.8, tier:0, solid:true, drop:'wood' },
   [LEAF]:     { name:'Leaves', color:'#2f7d32', hardness:0.4, tier:0, solid:false, drop:null },
   [COAL]:     { name:'Coal Ore', color:'#3a3a3a', hardness:2.6, tier:0, solid:true, drop:'coal', dot:'#111111' },
   [IRON]:     { name:'Iron Ore', color:'#9c7a5c', hardness:3.2, tier:1, solid:true, drop:'iron_ore', dot:'#d8b48a' },

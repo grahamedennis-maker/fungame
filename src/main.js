@@ -3,7 +3,7 @@ import { state, setWorld } from './state.js';
 import { generateWorld, tileAt } from './worldgen.js';
 import { spawnPlayer, updatePlayer, damagePlayer } from './player.js';
 import { updateMobs, updateSpawning, spawnMob } from './mobs.js';
-import { updateProjectiles, updateMining, updateEffects, updateBombs, doAttack } from './combat.js';
+import { updateProjectiles, updateMining, updateEffects, updateBombs, updateFalling, doAttack } from './combat.js';
 import { ITEMS } from './tiles.js';
 import { updateParticles } from './particles.js';
 import { updateBoss, spawnBoss } from './boss.js';
@@ -45,6 +45,7 @@ function loop(now){
     updateParticles(dt);
     updateEffects(dt);
     updateBombs(dt);
+    updateFalling(dt);
     updateBoss(dt);
     updateSpawning(dt);
     if(state.mouse.down && state.mouse.button===0){

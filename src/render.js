@@ -34,6 +34,30 @@ function drawGlow(g, color, radius, cx, cy, inner){
   g.drawImage(spr, cx-radius, cy-radius);
 }
 
+// Build a rounded-rect path over one tile cell, rounding only the corners that
+// are exposed to open space so terrain reads as organic rather than a hard grid.
+// tl/tr/br/bl are booleans (round that corner) — radius r.
+// A cell is "open" (not a solid neighbor) if it's off-world, air, or a
+// non-solid tile — used to decide which tile corners to round.
+function tileOpen(tx,ty){
+  if(tx<0||tx>=WORLD_W||ty<0||ty>=WORLD_H) return false;
+  const t = world.grid[ty][tx];
+  return t===AIR || !(TILES[t] && TILES[t].solid);
+}
+function roundTilePath(g, x, y, s, r, tl, tr, br, bl){
+  g.beginPath();
+  g.moveTo(x + (tl?r:0), y);
+  g.lineTo(x + s - (tr?r:0), y);
+  if(tr) g.quadraticCurveTo(x+s, y, x+s, y+r);
+  g.lineTo(x+s, y + s - (br?r:0));
+  if(br) g.quadraticCurveTo(x+s, y+s, x+s-r, y+s);
+  g.lineTo(x + (bl?r:0), y+s);
+  if(bl) g.quadraticCurveTo(x, y+s, x, y+s-r);
+  g.lineTo(x, y + (tl?r:0));
+  if(tl) g.quadraticCurveTo(x, y, x+r, y);
+  g.closePath();
+}
+
 function drawWhipCrack(p, psx, psy){
   const held = hotbarItem();
   const def = held && ITEMS[held.id];
@@ -64,19 +88,87 @@ function drawWhipCrack(p, psx, psy){
   }
 }
 
-const SWING_DUR = 220;
+const SWING_DUR = 240;
+// Terraria-style overhead melee sweep, expressed as the icon's rotation (the
+// upright icon points straight up = 0). The blade winds up behind the head and
+// sweeps down in front of the player, pivoting at the grip.
+const SWING_START = -0.63;   // up-and-back
+const SWING_END   =  2.37;   // down-and-front  (≈ 172° arc)
+const SWING_REST  =  0.40;   // idle ready pose (blade up, slightly forward)
+const MELEE_TOOLS = new Set(['sword','hammer','pick']);
+
+// The bright crescent smear that follows the blade through its arc — the
+// signature Terraria "slash". Drawn in the hand's (facing-flipped) frame as a
+// widening, brightening arc from the swing's start to the blade's current angle.
+function drawSlash(hx, hy, facing, rotNow, size, def){
+  const R = size*0.92;
+  const a0 = SWING_START - Math.PI/2;          // icon rot -> actual blade angle
+  const a1 = rotNow      - Math.PI/2;
+  const col = (def && def.glow) ? '#ffffff' : (def && def.color) || '#ffe6a0';
+  ctx.save();
+  ctx.translate(hx,hy);
+  if(facing<0) ctx.scale(-1,1);
+  ctx.lineCap='round';
+  const steps = 10;
+  for(let i=0;i<steps;i++){
+    const f0 = i/steps, f1 = (i+1)/steps;       // f=1 is the leading (current) edge
+    ctx.globalAlpha = 0.55*f1*f1;               // brightest & thickest at the tip
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.5 + 5.5*f1;
+    ctx.beginPath();
+    ctx.arc(0,0,R, a0+(a1-a0)*f0, a0+(a1-a0)*f1);
+    ctx.stroke();
+  }
+  ctx.globalAlpha=1; ctx.lineWidth=1; ctx.lineCap='butt';
+}
+
 function drawHeldTool(p, psx, psy){
   const held = hotbarItem();
   if(!held) return;
+  const def = ITEMS[held.id];
+  const tool = def && def.tool;
   const t = (performance.now() - state.swingStart) / SWING_DUR;
-  const angle = (t>=0 && t<1) ? (-1.1 + t*1.5) : 0.35; // wind-up -> strike, else idle rest pose
-  const size = 20;
-  const handX = psx + p.w/2 + p.facing*6, handY = psy + p.h*0.42;
+  const active = t>=0 && t<1;
+  const size = 22;
+  const handX = psx + p.w/2 + p.facing*4, handY = psy + p.h*0.44;
+
+  // Bow / wand: aim the weapon toward the cursor with a short recoil kick,
+  // instead of an overhead swing.
+  if(tool==='bow' || tool==='wand'){
+    const ang = Math.atan2(state.mouse.y - handY, state.mouse.x - handX);
+    const kick = active ? Math.sin(t*Math.PI)*3 : 0;
+    ctx.save();
+    ctx.translate(handX - Math.cos(ang)*kick, handY - Math.sin(ang)*kick);
+    ctx.rotate(ang + Math.PI/2);           // icon points up at 0 -> align to aim
+    ctx.translate(-size*0.5, -size*0.62);
+    drawItemIcon(ctx, held.id, size);
+    ctx.restore();
+    return;
+  }
+
+  // Whip: the animated lash (drawWhipCrack) is the real motion; just hold the
+  // handle in a ready pose so it doesn't double up with a sword-style swing.
+  if(tool==='whip'){
+    ctx.save();
+    ctx.translate(handX,handY);
+    if(p.facing<0) ctx.scale(-1,1);
+    ctx.rotate(SWING_REST);
+    ctx.translate(-size*0.5,-size*0.82);
+    drawItemIcon(ctx, held.id, size);
+    ctx.restore();
+    return;
+  }
+
+  // Melee (sword / hammer / pick / bare hand): wide overhead arc pivoting at the
+  // grip, eased so it snaps through the middle of the swing.
+  const e = active ? (1 - (1-t)*(1-t)) : 1;                 // ease-out
+  const rot = active ? (SWING_START + (SWING_END-SWING_START)*e) : SWING_REST;
+  if(active && (tool==='sword' || tool==='hammer')) drawSlash(handX, handY, p.facing, rot, size, def);
   ctx.save();
   ctx.translate(handX,handY);
   if(p.facing<0) ctx.scale(-1,1);
-  ctx.rotate(angle);
-  ctx.translate(-size/2,-size/2);
+  ctx.rotate(rot);
+  ctx.translate(-size*0.5, -size*0.82);       // pivot at the grip so the blade sweeps out
   drawItemIcon(ctx, held.id, size);
   ctx.restore();
 }
@@ -274,6 +366,23 @@ export function render(){
       if(t===LADDER){ drawLadderTile(sx,sy); continue; }
       if(t===VINE){ drawVineTile(sx,sy); continue; }
 
+      // Round only the corners exposed to open space, so the terrain silhouette
+      // is organic instead of a hard grid. Interior tiles stay square (fast path).
+      const oL = tileOpen(tx-1,ty), oR = tileOpen(tx+1,ty), oU = tileOpen(tx,ty-1), oD = tileOpen(tx,ty+1);
+      const cTL = oL&&oU, cTR = oR&&oU, cBR = oR&&oD, cBL = oL&&oD;
+      let clipped = false;
+      if(cTL||cTR||cBR||cBL){
+        const surfY = world.surface[tx];
+        if(ty > surfY+1){ // underground: back the cut corners with cave color, not stale sky
+          ctx.fillStyle = (ty-surfY)<9 ? '#3f2c1a' : '#2f2f38';
+          ctx.fillRect(sx,sy,TILE+1,TILE+1);
+        }
+        ctx.save();
+        roundTilePath(ctx, sx, sy, TILE+1, 5, cTL, cTR, cBR, cBL);
+        ctx.clip();
+        clipped = true;
+      }
+
       ctx.fillStyle = def.color;
       ctx.fillRect(sx,sy,TILE+1,TILE+1);
 
@@ -361,6 +470,7 @@ export function render(){
         ctx.fillStyle = shade(def.dot,60);
         ctx.fillRect(sx+3,sy+3,1,1); ctx.fillRect(sx+9,sy+9,1,1);
       }
+      if(clipped){ ctx.restore(); clipped=false; } // stop clipping before glow so it can bleed past the rounded edge
       if(def.glow){
         ctx.globalAlpha=0.6;
         drawGlow(ctx, def.glow, 9, sx+8, sy+8, 1);
@@ -392,6 +502,15 @@ export function render(){
     if(m.shock>0 && Math.floor(state.time/80)%2===0){ ctx.fillStyle='rgba(232,250,255,0.65)'; ctx.fillRect(sx,sy,m.w,m.h); }
     ctx.fillStyle='#000a'; ctx.fillRect(sx,sy-6,m.w,3);
     ctx.fillStyle='#e05353'; ctx.fillRect(sx,sy-6,m.w*clamp(m.hp/MOB_TYPES[m.type].hp,0,1),3);
+  }
+
+  // falling blocks (dislodged tree wood/leaves tumbling down)
+  for(const b of state.falling){
+    const bx = b.x-state.camX, by = b.y-state.camY;
+    const def = TILES[b.tile];
+    ctx.fillStyle = def.color; ctx.fillRect(bx,by,TILE,TILE);
+    ctx.fillStyle = shade(def.color,26); ctx.fillRect(bx,by,TILE,2); ctx.fillRect(bx,by,2,TILE);
+    ctx.fillStyle = shade(def.color,-30); ctx.fillRect(bx,by+TILE-2,TILE,2); ctx.fillRect(bx+TILE-2,by,2,TILE);
   }
 
   // projectiles (boss/special shots carry their own color)

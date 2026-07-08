@@ -89,7 +89,7 @@ export function loadGame(){
   state.bossCooldown = data.bossCooldown;
   // transient runtime arrays never persist; start empty each load
   state.mobs = []; state.projectiles = []; state.particles = [];
-  state.zaps = []; state.waves = []; state.flashes = []; state.bombs = []; state.boss = null;
+  state.zaps = []; state.waves = []; state.flashes = []; state.bombs = []; state.falling = []; state.boss = null;
   return true;
 }
 

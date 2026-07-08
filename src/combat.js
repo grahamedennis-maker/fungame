@@ -1,5 +1,5 @@
 import { TILE, REACH, AIR, ALTAR, COAL, IRON, GOLD, THORIUM, WORLD_H, BEDROCK,
-         STONE, GRASS, WOODT, JUNGLEGRASS } from './constants.js';
+         STONE, GRASS, WOODT, LEAF, JUNGLEGRASS } from './constants.js';
 import { clamp, ri, chance } from './utils.js';
 import { state, world } from './state.js';
 import { tileAt, setTile, tileDef, tileSolid } from './worldgen.js';
@@ -299,8 +299,42 @@ export function updateMining(dt){
     if(def.drop) addItem(def.drop,1);
     if(t===COAL||t===IRON||t===GOLD||t===THORIUM) msg('Found '+def.name+'!');
     setTile(tx,ty,AIR);
+    dislodgeAbove(tx,ty); // tree wood/leaves above lose support and fall
     state.mining=null; // next frame retargets the block now under the cursor
   }
+}
+
+/* ---------- FALLING BLOCKS (Terraria-style tree collapse) ---------- */
+// Tiles that tumble when the block beneath them is removed. Trees are the main
+// case: chop any part of a trunk and everything resting on it drops.
+const FALLABLE = new Set([WOODT, LEAF]);
+// When a tile is cleared, detach the contiguous run of fallable tiles directly
+// above it into free-falling blocks (each becomes a live physics entity).
+export function dislodgeAbove(tx,ty){
+  for(let y=ty-1; y>0; y--){
+    const t = tileAt(tx,y);
+    if(!FALLABLE.has(t)) break;
+    setTile(tx,y,AIR);
+    state.falling.push({ x:tx*TILE, y:y*TILE, vy:1, tile:t });
+  }
+}
+export function updateFalling(dt){
+  if(!state.falling.length) return;
+  for(const b of state.falling){ b.vy = Math.min(b.vy + 0.5*dt, 16); b.y += b.vy*dt; }
+  // Settle the lowest blocks first so a falling stack re-lands in order without
+  // two blocks racing for the same cell.
+  state.falling.sort((a,b)=>b.y-a.y);
+  const remain = [];
+  for(const b of state.falling){
+    const tx = Math.floor((b.x+TILE/2)/TILE);
+    const belowTy = Math.floor((b.y+TILE)/TILE);
+    if(belowTy>=WORLD_H || tileSolid(tileAt(tx,belowTy))){
+      const restTy = belowTy-1;
+      if(restTy>=0 && restTy<WORLD_H && tileAt(tx,restTy)===AIR) setTile(tx,restTy,b.tile);
+      else { const d = tileDef(b.tile).drop; if(d) addItem(d,1); } // no room — pop as an item
+    } else remain.push(b);
+  }
+  state.falling = remain;
 }
 
 const dungeonLoot = ['thunder_shard','gold_bar','iron_bar','storm_core','arrow'];
