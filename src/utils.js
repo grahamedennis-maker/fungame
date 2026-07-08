@@ -6,10 +6,14 @@ export function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
 // Deterministic pseudo-random value in [0,1) for a pair of integers, used to
 // give tiles stable per-cell texture (speckles, cracks, grain) that doesn't
-// flicker between frames the way Math.random() would.
+// flicker between frames the way Math.random() would. Uses a cheap integer
+// bit-mix (Math.imul) rather than Math.sin — this runs several times per tile
+// per frame, so avoiding the trig call is a real render-time saving.
 export function hash2(x,y){
-  const s = Math.sin(x*127.1 + y*311.7) * 43758.5453;
-  return s - Math.floor(s);
+  let h = Math.imul((x|0) ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul((y|0) ^ 0x27d4eb2f, 0xc2b2ae35);
+  h = Math.imul(h ^ (h>>>15), 0x85ebca6b);
+  h ^= h>>>13;
+  return (h>>>0) / 4294967296;
 }
 
 // Lighten (amt>0) or darken (amt<0) a '#rrggbb' color by amt (-255..255).

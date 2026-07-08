@@ -10,6 +10,30 @@ import { canvas, ctx } from './canvas.js';
 import { hotbarItem } from './inventory.js';
 import { drawItemIcon } from './icons.js';
 
+// Cached radial-glow sprites. Building a CanvasGradient + fill for every glowing
+// tile, torch and light source every frame is a major per-frame cost; instead we
+// bake each (color, radius) gradient into a small offscreen canvas once and blit
+// it with drawImage, which is far cheaper and reused across all matching sources.
+const glowSprites = new Map();
+function glowSprite(color, radius, inner){
+  const key = color+'|'+radius+'|'+(inner||0);
+  let s = glowSprites.get(key);
+  if(s) return s;
+  const d = Math.ceil(radius*2);
+  s = document.createElement('canvas'); s.width=d; s.height=d;
+  const g = s.getContext('2d');
+  const rg = g.createRadialGradient(radius,radius,inner||0, radius,radius,radius);
+  rg.addColorStop(0,color); rg.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=rg; g.fillRect(0,0,d,d);
+  glowSprites.set(key,s);
+  return s;
+}
+// blit a cached glow centered at (cx,cy)
+function drawGlow(g, color, radius, cx, cy, inner){
+  const spr = glowSprite(color, radius, inner);
+  g.drawImage(spr, cx-radius, cy-radius);
+}
+
 function drawWhipCrack(p, psx, psy){
   const held = hotbarItem();
   const def = held && ITEMS[held.id];
@@ -220,6 +244,12 @@ export function render(){
 
   const underground = p.y/TILE > (world.surface[clamp(Math.floor(p.x/TILE),0,WORLD_W-1)]+3);
 
+  // Light sources gathered during the single tile pass below, so the torch-glow
+  // and darkness passes iterate these short lists instead of re-scanning the
+  // whole viewport grid two more times. Screen-space centers (valid this frame).
+  const torchLights = [];  // {x,y}
+  const dimLights = [];     // {x,y} — brick/altar ambient glow (for darkness)
+
   for(let ty=y0; ty<=y1; ty++){
     for(let tx=x0; tx<=x1; tx++){
       const t = world.grid[ty][tx];
@@ -240,7 +270,7 @@ export function render(){
       const def = TILES[t];
       const sx = tx*TILE - state.camX, sy = ty*TILE - state.camY;
 
-      if(t===TORCH){ drawTorchTile(sx,sy); continue; }
+      if(t===TORCH){ drawTorchTile(sx,sy); torchLights.push({x:sx+TILE/2, y:sy+TILE/2}); continue; }
       if(t===LADDER){ drawLadderTile(sx,sy); continue; }
       if(t===VINE){ drawVineTile(sx,sy); continue; }
 
@@ -332,24 +362,16 @@ export function render(){
         ctx.fillRect(sx+3,sy+3,1,1); ctx.fillRect(sx+9,sy+9,1,1);
       }
       if(def.glow){
-        const g = ctx.createRadialGradient(sx+8,sy+8,1,sx+8,sy+8,9);
-        g.addColorStop(0, def.glow); g.addColorStop(1,'rgba(0,0,0,0)');
-        ctx.fillStyle=g; ctx.globalAlpha=0.6;
-        ctx.fillRect(sx-2,sy-2,TILE+4,TILE+4);
+        ctx.globalAlpha=0.6;
+        drawGlow(ctx, def.glow, 9, sx+8, sy+8, 1);
         ctx.globalAlpha=1;
+        if(t===BRICKGLOW || t===ALTAR) dimLights.push({x:sx+8, y:sy+8});
       }
     }
   }
 
-  // torches light glow
-  for(let ty=y0; ty<=y1; ty++) for(let tx=x0; tx<=x1; tx++){
-    if(world.grid[ty][tx]===TORCH){
-      const sx = tx*TILE - state.camX + TILE/2, sy = ty*TILE - state.camY + TILE/2;
-      const g = ctx.createRadialGradient(sx,sy,2,sx,sy,70);
-      g.addColorStop(0,'rgba(255,180,80,0.35)'); g.addColorStop(1,'rgba(255,180,80,0)');
-      ctx.fillStyle=g; ctx.fillRect(sx-70,sy-70,140,140);
-    }
-  }
+  // torches light glow (from the list gathered in the tile pass)
+  for(const L of torchLights) drawGlow(ctx, 'rgba(255,180,80,0.35)', 70, L.x, L.y, 2);
 
   // particles
   for(const pt of state.particles){
@@ -471,20 +493,12 @@ export function render(){
     octx.fillStyle='rgba(4,2,10,0.86)';
     octx.fillRect(0,0,offCanvas.width,offCanvas.height);
     octx.globalCompositeOperation='destination-out';
-    function lightAt(sx,sy,r){
-      const g = octx.createRadialGradient(sx,sy,0,sx,sy,r);
-      g.addColorStop(0,'rgba(0,0,0,1)'); g.addColorStop(1,'rgba(0,0,0,0)');
-      octx.fillStyle=g; octx.fillRect(sx-r,sy-r,r*2,r*2);
-    }
+    // Punch light holes with cached black-glow sprites (source alpha erases the
+    // darkness). Reuses the torch/brick lists gathered during the tile pass.
+    const lightAt = (sx,sy,r)=>drawGlow(octx, 'rgba(0,0,0,1)', r, sx, sy, 0);
     lightAt(psx+p.w/2, psy+p.h/2, 150);
-    for(let ty=y0; ty<=y1; ty++) for(let tx=x0; tx<=x1; tx++){
-      if(world.grid[ty][tx]===TORCH){
-        lightAt(tx*TILE-state.camX+TILE/2, ty*TILE-state.camY+TILE/2, 130);
-      }
-      if(world.grid[ty][tx]===BRICKGLOW || world.grid[ty][tx]===ALTAR){
-        lightAt(tx*TILE-state.camX+TILE/2, ty*TILE-state.camY+TILE/2, 60);
-      }
-    }
+    for(const L of torchLights) lightAt(L.x, L.y, 130);
+    for(const L of dimLights)   lightAt(L.x, L.y, 60);
     octx.globalCompositeOperation='source-over';
     ctx.drawImage(offCanvas,0,0);
   }
