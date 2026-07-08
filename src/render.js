@@ -9,7 +9,7 @@ import { BOSS_TYPES } from './boss.js';
 import { canvas, ctx } from './canvas.js';
 import { hotbarItem } from './inventory.js';
 import { drawItemIcon } from './icons.js';
-import { ATLAS_IDS, drawBodyTile, drawEdgeTile } from './textures.js';
+import { ATLAS_IDS, drawBodyTile, drawEdgeTile, buildAtlas } from './textures.js';
 
 // Cached radial-glow sprites. Building a CanvasGradient + fill for every glowing
 // tile, torch and light source every frame is a major per-frame cost; instead we
@@ -321,6 +321,7 @@ function drawBackground(sky){
 let offCanvas = null;
 
 export function render(){
+  buildAtlas(); // idempotent safety net: guarantees the tile atlas exists before any blit
   const p = state.player;
   state.camX = clamp(p.x - canvas.width/2, 0, WORLD_W*TILE - canvas.width);
   state.camY = clamp(p.y - canvas.height/2, -200, WORLD_H*TILE - canvas.height);
