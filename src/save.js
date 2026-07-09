@@ -1,8 +1,8 @@
 import { state, world, setWorld } from './state.js';
 import { ITEMS } from './tiles.js';
 
-const SAVE_KEY = 'deepcrag-save-v4';
-const SAVE_VERSION = 4;
+const SAVE_KEY = 'deepcrag-save-v5'; // bumped: old worlds had pre-rework branchy trees; force a fresh world
+const SAVE_VERSION = 5;
 
 export function hasSave(){
   try { return !!localStorage.getItem(SAVE_KEY); } catch { return false; }

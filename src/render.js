@@ -271,11 +271,14 @@ function drawFoliage(def, tx, ty, sx, sy){
   if(oU){ ctx.fillStyle=shade(col,20); ctx.fillRect(sx,sy,TILE+1,4); }
   if(oD){ ctx.fillStyle=shade(col,-26); ctx.fillRect(sx,sy+TILE-4,TILE+1,4); }
   ctx.fillStyle=col;
+  // LEAF_SIZE controls how big the individual leaf clumps read (smaller = finer
+  // foliage). Bump the base radius and spacing together to resize the leaves.
+  const LEAF_R = 1.8, LEAF_STEP = 3;
   const bump=(bx,by,r,c)=>{ ctx.fillStyle=c; ctx.beginPath(); ctx.arc(bx,by,r,0,Math.PI*2); ctx.fill(); };
-  if(oU) for(let i=1;i<=15;i+=4) bump(sx+i, sy,       3+hash2(tx+i,ty)*1.8,  shade(col,16));  // lit crown bumps
-  if(oD) for(let i=1;i<=15;i+=4) bump(sx+i, sy+TILE,   3+hash2(tx+i,ty+5)*1.8, shade(col,-24)); // shaded underside bumps
-  if(oL) for(let i=1;i<=15;i+=4) bump(sx,    sy+i,     3+hash2(tx,ty+i)*1.8,  col);
-  if(oR) for(let i=1;i<=15;i+=4) bump(sx+TILE, sy+i,   3+hash2(tx+5,ty+i)*1.8, col);
+  if(oU) for(let i=1;i<=15;i+=LEAF_STEP) bump(sx+i, sy,     LEAF_R+hash2(tx+i,ty)*1.2,  shade(col,16));  // lit crown clumps
+  if(oD) for(let i=1;i<=15;i+=LEAF_STEP) bump(sx+i, sy+TILE, LEAF_R+hash2(tx+i,ty+5)*1.2, shade(col,-24)); // shaded underside
+  if(oL) for(let i=1;i<=15;i+=LEAF_STEP) bump(sx,    sy+i,   LEAF_R+hash2(tx,ty+i)*1.2,  col);
+  if(oR) for(let i=1;i<=15;i+=LEAF_STEP) bump(sx+TILE, sy+i, LEAF_R+hash2(tx+5,ty+i)*1.2, col);
   // fine leaf texture: light dapples, dark flecks and a couple of veins
   ctx.fillStyle=shade(col,22);
   ctx.fillRect(sx+2+((h*9)|0),  sy+2+((h2*9)|0), 2,2);
