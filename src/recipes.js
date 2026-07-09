@@ -1,6 +1,6 @@
 export const RECIPES = [
-  { out:'wood_pickaxe', n:1, station:null, req:{wood:6} },
-  { out:'wood_sword', n:1, station:null, req:{wood:5} },
+  // wood weapons/tools are no longer craftable — you start with a wood pickaxe and
+  // a copper sword, and progress via metal gear
   { out:'torch', n:4, station:null, req:{wood:1,coal:1} },
   { out:'ladder', n:4, station:null, req:{wood:2} },
   { out:'crafting_table', n:1, station:null, req:{wood:8} },
@@ -34,6 +34,15 @@ export const RECIPES = [
   { out:'titanium_pickaxe', n:1, station:'table', req:{titanium_bar:6,wood:3} },
   { out:'meteorite_pickaxe', n:1, station:'table', req:{meteorite_bar:6,titanium_bar:2} },
   { out:'meteorite_sword', n:1, station:'table', req:{meteorite_bar:8,titanium_bar:2} },
+
+  // ---- SWORDS for every remaining metal, so no ore (except coal) is a dead end ----
+  { out:'copper_sword', n:1, station:'table', req:{copper_bar:4,wood:2} },
+  { out:'tin_sword', n:1, station:'table', req:{tin_bar:4,wood:2} },
+  { out:'lead_sword', n:1, station:'table', req:{lead_bar:4,wood:2} },
+  { out:'silver_sword', n:1, station:'table', req:{silver_bar:4,wood:2} },
+  { out:'tungsten_sword', n:1, station:'table', req:{tungsten_bar:4,wood:2} },
+  { out:'platinum_sword', n:1, station:'table', req:{platinum_bar:4,wood:2} },
+  { out:'cobalt_sword', n:1, station:'table', req:{cobalt_bar:4,wood:2} },
 
   // ---- ARMOR: crafted at a table from bars (helmet/chest/boots per set) ----
   { out:'copper_helmet', n:1, station:'table', req:{copper_bar:4} },

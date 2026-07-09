@@ -21,9 +21,12 @@ function rng(seed){ let s=(seed>>>0)||1; return ()=>{ s=(Math.imul(s,1664525)+10
 // smooth fbm mottle of the base color across the cell (2px blocks keep bake cheap)
 function fillMottle(g, color, v, id, amt){
   const ox=(id*13+v*97)%64, oy=(id*29+v*53)%64;
-  for(let y=0;y<TS;y+=2) for(let x=0;x<TS;x+=2){
+  const step = amt/3;                         // 7 discrete tones per block:
+  for(let y=0;y<TS;y+=2) for(let x=0;x<TS;x+=2){ //   3 dark, the exact colour, 3 light
     const n=fbm((x+ox)/5.5,(y+oy)/5.5,2);
-    g.fillStyle=shade(color, Math.round((n-0.5)*amt));
+    let lvl = Math.round((n-0.5)*7);           // spread noise across -3..+3 bands
+    lvl = lvl<-3 ? -3 : lvl>3 ? 3 : lvl;
+    g.fillStyle=shade(color, Math.round(lvl*step));
     g.fillRect(x,y,2,2);
   }
 }
@@ -43,7 +46,10 @@ function bakeStone(g,def,v,id){
   if(r()<0.18){ g.fillStyle='#3d6b3a'; g.fillRect(2+(r()*10|0),2+(r()*10|0),3,2); } // moss fleck
 }
 function bakeOre(g,def,v,id){
-  bakeStone(g,def,v,id);                 // host rock
+  // Ore = grey stone with the ore colour showing only as embedded nuggets, so it
+  // reads as ore *inside* stone. Meteorite is its own rock, so it keeps its colour.
+  const host = (id===METEORITE) ? def : (TILES[STONE] || def);
+  bakeStone(g,host,v,id);                 // host rock
   const r=rng(id*613+v*271);
   for(let i=0,nug=2+(r()*2|0);i<nug;i++){
     const cx=3+(r()*9|0), cy=3+(r()*9|0), s=2+(r()*2|0);

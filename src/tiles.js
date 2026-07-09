@@ -110,6 +110,14 @@ export const ITEMS = {
   titanium_pickaxe:{ name:'Titanium Pickaxe', color:'#c0a8d8', stack:1, tool:'pick', tier:4, power:4.2, dmg:13, glow:true },
   meteorite_pickaxe:{ name:'Meteorite Pickaxe', color:'#ff8a6a', stack:1, tool:'pick', tier:4, power:5.0, dmg:16, glow:true },
   meteorite_sword:{ name:'Meteorite Sword', color:'#ff7a4a', stack:1, tool:'sword', dmg:26, range:34, glow:true, special:'magma', specialCd:5000 },
+  // swords for the remaining metals so every ore (except coal) crafts into gear
+  tin_sword:     { name:'Tin Sword',      color:'#cfc39a', stack:1, tool:'sword', dmg:8,  range:26 },
+  lead_sword:    { name:'Lead Sword',     color:'#8f96a8', stack:1, tool:'sword', dmg:10, range:27 },
+  silver_sword:  { name:'Silver Sword',   color:'#e8ecf2', stack:1, tool:'sword', dmg:14, range:28 },
+  tungsten_sword:{ name:'Tungsten Sword', color:'#aeb8ad', stack:1, tool:'sword', dmg:16, range:28 },
+  platinum_sword:{ name:'Platinum Sword', color:'#dfeaf5', stack:1, tool:'sword', dmg:20, range:29 },
+  cobalt_sword:  { name:'Cobalt Sword',   color:'#4a9be0', stack:1, tool:'sword', dmg:22, range:30, glow:true },
+  copper_sword:  { name:'Copper Sword',   color:'#e08b4a', stack:1, tool:'sword', dmg:7,  range:26, grip:'#6b6a37' },
   bow:         { name:'Storm Bow', color:'#7a5a2b', stack:1, tool:'bow', dmg:11, range:220 },
   arrow:       { name:'Arrow', color:'#caa24a', stack:99, ammo:true },
 

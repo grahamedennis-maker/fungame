@@ -125,13 +125,6 @@ export function generateWorld(W,H){
       const gap  = jungle ? 8 : 9;         // min spacing so distinct rounded crowns don't merge
       if(x-lastTreeX>gap && chance(dens)){ lastTreeX=x;
         if(jungle) placeTree(x, JUNGLEWOOD, JUNGLELEAF); else placeTree(x, TREEWOOD, LEAF); }
-      else if(x-lastTreeX>2 && chance(0.05)){ lastTreeX=x;   // little ground bushes between trees
-        placeShrub(x, jungle?JUNGLELEAF:LEAF); }
-      // hanging jungle vines
-      if(b==='jungle' && chance(0.10)){
-        const sy=surface[x], vl=ri(2,5);
-        for(let i=1;i<=vl;i++){ if(sy+i<H && grid[sy+i][x]===AIR) grid[sy+i][x]=VINE; }
-      }
     }
   }
 
@@ -193,14 +186,9 @@ export function generateWorld(W,H){
       if(grid[y][x]!==AIR) continue;
       const solidUp = solidT(grid[y-1][x]), solidDn = solidT(grid[y+1][x]);
       if(solidUp && !solidDn){                                    // ceiling feature
-        if(lush && chance(0.06)){                                 // lush: dangling vines
-          for(let i=0, n=ri(2,5); i<n; i++){ if(grid[y+i] && grid[y+i][x]===AIR) grid[y+i][x]=VINE; else break; }
-        } else if(chance(0.09)) growSpike(x,y,true, ri(1,4));     // stalactite, length 1–4
+        if(chance(0.09)) growSpike(x,y,true, ri(1,4));            // stalactite, length 1–4
       } else if(solidDn && !solidUp){                             // floor feature
-        if(lush && chance(0.16)){                                 // lush: glowing mushroom clusters
-          grid[y][x]=GLOWSHROOM;
-          if(chance(0.5) && x+1<xb && grid[y][x+1]===AIR && solidT(grid[y+1][x+1])) grid[y][x+1]=GLOWSHROOM;
-        } else if(chance(0.08)) growSpike(x,y,false, ri(1,4));    // stalagmite, length 1–4
+        if(chance(0.08)) growSpike(x,y,false, ri(1,4));           // stalagmite, length 1–4
       }
     }
     // moss creeping over exposed cave walls — lush caverns are thickly overgrown
@@ -267,7 +255,7 @@ export function generateWorld(W,H){
     for(const [tile,seeds,bmin,bmax] of [
       [COAL,3,24,150],[COPPER,2,26,95],[TIN,2,28,105],[LEAD,2,55,150],[IRON,2,70,180],
       [SILVER,2,95,205],[TUNGSTEN,1,115,225],[GOLD,1,125,245],[PLATINUM,1,150,265],
-      [OBSIDIAN,1,185,305],[COBALT,1,205,314],[TITANIUM,1,225,315]]){
+      [COBALT,1,205,314],[TITANIUM,1,225,315]]){
       const lo=Math.max(y0b,bmin), hi=Math.min(y1b,bmax);
       if(hi>lo+1) scatterOre(tile, seeds, lo, hi, 1,3, x0b, x1b);
     }
@@ -278,28 +266,27 @@ export function generateWorld(W,H){
   // bottom: coal + copper + tin dominate the shallows, each metal then owns its own
   // band deeper down, and obsidian/cobalt/titanium sit at the very bottom — rarer
   // (fewer seeds, smaller veins) the deeper they go.
-  scatterOre(COAL, Math.round(W*0.24), 24, 150, 3, 7);   // coal: shallow-to-mid, common
+  scatterOre(COAL, Math.round(W*0.14), 24, 150, 2, 5);   // coal: shallow-to-mid, common-ish
   //         tile       density       minY  maxY  veinMin veinMax
   const ORES = [
-    [COPPER,   0.110,  26,  95, 2, 6],   // top layers
-    [TIN,      0.085,  28, 105, 2, 5],   // top layers
-    [LEAD,     0.060,  55, 150, 2, 5],
-    [IRON,     0.052,  70, 180, 2, 5],
-    [SILVER,   0.040,  95, 205, 2, 4],
-    [TUNGSTEN, 0.030, 115, 225, 2, 4],
-    [GOLD,     0.024, 125, 245, 2, 4],
-    [PLATINUM, 0.017, 150, 265, 1, 3],
-    [OBSIDIAN, 0.012, 185, 305, 2, 4],   // bottom layers, rare
-    [COBALT,   0.009, 205, 314, 1, 3],   // bottom layers, rare
-    [TITANIUM, 0.006, 225, 315, 1, 3],   // deepest, rarest
+    [COPPER,   0.058,  26,  95, 2, 5],   // top layers
+    [TIN,      0.044,  28, 105, 2, 4],   // top layers
+    [LEAD,     0.030,  55, 150, 2, 4],
+    [IRON,     0.026,  70, 180, 2, 4],
+    [SILVER,   0.019,  95, 205, 1, 3],
+    [TUNGSTEN, 0.014, 115, 225, 1, 3],
+    [GOLD,     0.011, 125, 245, 1, 3],
+    [PLATINUM, 0.0075, 150, 265, 1, 3],
+    [COBALT,   0.0045, 205, 314, 1, 2],  // bottom layers, rare
+    [TITANIUM, 0.0028, 225, 315, 1, 2],  // deepest, rarest
   ];
   for(const [tile, dens, minY, maxY, vmin, vmax] of ORES){
     scatterOre(tile, Math.round(W*dens), minY, maxY, vmin, vmax);
   }
 
-  // Meteors: rare crash sites of charred debris, each hiding 1–3 meteorite blocks.
-  const numMeteors = Math.max(1, Math.round(W/2200));
-  for(let m=0;m<numMeteors;m++) placeMeteor(ri(20, W-20));
+  // Meteors are NOT placed at world-gen. Instead a single tiny meteor has a rare
+  // (1-in-25000 per minute) chance to land somewhere random during play — see
+  // updateMeteors / strikeMeteor.
 
   // Each dungeon is a cluster of open, walkable chambers linked by wide
   // carved tunnels. Rooms are hollow boxes (glowing brick walls, a floor
@@ -512,20 +499,21 @@ export function tileSolid(id){ return !!tileDef(id).solid; }
 // worldgen placeMeteor but writes through world.grid + updates surface[].
 export function strikeMeteor(cx){
   if(!world) return;
-  cx = clamp(cx, 6, WORLD_W-6);
-  const sy = world.surface[cx];
-  const R = ri(3,5), cy = sy + R - 1;
-  for(let oy=-R; oy<=R; oy++) for(let ox=-R; ox<=R; ox++){
-    if(ox*ox+oy*oy > R*R) continue;
+  cx = clamp(cx, 4, WORLD_W-4);
+  // A tiny meteor (max 3x3) resting ON the ground. It only fills AIR cells, so it
+  // never breaks/overwrites existing blocks. 1–3 of the tiles are meteorite ore.
+  const base = world.surface[cx];
+  const cy = base - 2;                       // 3 rows above the surface top -> sits on the ground
+  for(let oy=-1; oy<=1; oy++) for(let ox=-1; ox<=1; ox++){
     const gx=cx+ox, gy=cy+oy;
-    if(gx<2||gx>=WORLD_W-2||gy<2||gy>=WORLD_H-2) continue;
-    if(world.grid[gy][gx]===BEDROCK) continue;
-    world.grid[gy][gx] = (oy < -R+2 && world.grid[gy][gx]===AIR) ? AIR : METEORDEBRIS;
+    if(gx<2||gx>=WORLD_W-2||gy<1||gy>=WORLD_H-1) continue;
+    if(world.grid[gy][gx]!==AIR) continue;   // never overwrite an existing block
+    world.grid[gy][gx]=METEORDEBRIS;
   }
-  const chunk = ri(1,3), spots=[[0,0],[1,0],[-1,0],[0,1],[1,1],[-1,1]];
+  const chunk = ri(1,3), spots=[[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,-1]];
   for(let i=0;i<chunk;i++){ const [ox,oy]=spots[i]; const gx=cx+ox, gy=cy+oy;
     if(world.grid[gy] && world.grid[gy][gx]===METEORDEBRIS) world.grid[gy][gx]=METEORITE; }
-  // raise the surface line so the debris mound reads as terrain (lighting/darkness)
-  for(let ox=-R; ox<=R; ox++){ const gx=cx+ox; if(gx>1&&gx<WORLD_W-1){
-    for(let y=Math.max(1,cy-R); y<=cy+R; y++){ if(tileSolid(world.grid[y][gx])){ if(y<world.surface[gx]) world.surface[gx]=y; break; } } } }
+  // lift the surface line to the mound top so it lights like terrain (no block change)
+  for(let ox=-1; ox<=1; ox++){ const gx=cx+ox; if(gx>1&&gx<WORLD_W-1){
+    for(let y=cy-1; y<=base; y++){ if(world.grid[y] && world.grid[y][gx]!==AIR && tileSolid(world.grid[y][gx])){ if(y<world.surface[gx]) world.surface[gx]=y; break; } } } }
 }

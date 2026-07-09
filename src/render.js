@@ -1,6 +1,7 @@
 import { WORLD_W, WORLD_H, TILE, AIR, DIRT, GRASS, STONE, WOODT, LEAF,
          BRICK, BRICKGLOW, CHEST, ALTAR, TORCH, CRAFT_TABLE, FURNACE, SAND, DUNGFLOOR,
-         LADDER, VINE, TREEWOOD, WATER, DRIPSTONE, GLOWSHROOM, JUNGLELEAF, JUNGLEWOOD } from './constants.js';
+         LADDER, VINE, TREEWOOD, WATER, DRIPSTONE, GLOWSHROOM, JUNGLELEAF, JUNGLEWOOD,
+         METEORITE, METEORDEBRIS } from './constants.js';
 import { clamp, hash2, shade } from './utils.js';
 import { state, world } from './state.js';
 import { TILES, ITEMS } from './tiles.js';
@@ -78,7 +79,12 @@ function carveTilePath(g, x, y, s, oU, oR, oD, oL, tx, ty){
   g.beginPath();
   g.rect(x, y, s, s);
   const H=(a,b)=>hash2(tx*7+a+1, ty*7+b+1);
-  const ksize=(a,b)=>{ const h=H(a,b); return 2 + (h>0.55?1:0) + (h>0.85?1:0); }; // 2..4 px
+  // Meteor rock rounds harder on its exposed corners so a small cluster reads as
+  // a circular ball on the outside while staying blocky/8-bit inside.
+  const mt = world.grid[ty] && world.grid[ty][tx];
+  const round = (mt===METEORITE || mt===METEORDEBRIS);
+  const ksize = round ? ((a,b)=> 5 + (H(a,b)>0.6?1:0))          // 5..6 px -> strong round corners
+                      : ((a,b)=> 2 + (H(a,b)>0.55?1:0) + (H(a,b)>0.85?1:0)); // 2..4 px
   // staircase carves at convex (both-open) corners
   if(oU&&oL){ const k=ksize(1,1);  for(let i=0;i<k;i++) g.rect(x,           y+i,       k-i, 1); }
   if(oU&&oR){ const k=ksize(2,1);  for(let i=0;i<k;i++) g.rect(x+s-(k-i),   y+i,       k-i, 1); }
@@ -146,8 +152,8 @@ function drawHeldTool(p, psx, psy){
   const tool = def && def.tool;
   const t = (performance.now() - state.swingStart) / SWING_DUR;
   const active = t>=0 && t<1;
-  const size = 22;
-  const handX = psx + p.w/2 + p.facing*4, handY = psy + p.h*0.44;
+  const size = Math.round(p.h*0.95);   // weapon scales with the player's height
+  const handX = psx + p.w/2 + p.facing*Math.round(p.w*0.35), handY = psy + p.h*0.44;
 
   // Bow: aim the weapon toward the cursor with a short recoil kick,
   // instead of an overhead swing.
@@ -163,31 +169,35 @@ function drawHeldTool(p, psx, psy){
     return;
   }
 
-  // Pickaxe: swing toward the cursor. The head arcs through MINE_ARC (135°),
-  // finishing in the aim direction — matching the swing-collision mining — instead
-  // of a fixed overhead chop, so it visibly strikes wherever you're digging.
+  // Pickaxe & melee: a FACING-based swing (independent of the cursor). Facing
+  // right the tool sweeps 225°->0° (an over-the-top chop into the right); facing
+  // left it mirrors, 315°->180° (into the left). Aiming up or down doesn't tilt
+  // the swing — it uses the last horizontal facing (p.facing), so it looks like
+  // the last L/R direction you moved. (Mining still targets the block toward the
+  // cursor; this is purely the animation.)
+  const f = p.facing<0 ? -1 : 1;
+  const e = active ? (1 - (1-t)*(1-t)) : 1;                  // ease-out
+  // Shared swing (pickaxe and sword use the SAME animation): a full 225° arc that
+  // winds up behind the head and finishes pointing the way the player faces.
+  // Screen angles: 0°=right, 90°=down, 180°=left, 270°=up.
+  const SARC = Math.PI*1.25;                                // 225°
+  const endAng = f>0 ? 0 : Math.PI;                         // finish horizontal in facing dir
+  const meleeStart = f>0 ? (endAng - SARC) : (endAng + SARC);
+  const bladeAng = active ? (meleeStart + (endAng - meleeStart)*e) : meleeStart;
+
   if(tool==='pick'){
-    const aim = Math.atan2(state.mouse.y - handY, state.mouse.x - handX);
-    const eP = 1 - (1-t)*(1-t);
-    const headAng = active ? (aim - MINE_ARC + MINE_ARC*eP) : (aim - MINE_ARC*0.5);
     ctx.save();
     ctx.translate(handX, handY);
-    ctx.rotate(headAng + Math.PI/2);            // icon points up at 0 -> align head to the arc
+    ctx.rotate(bladeAng + Math.PI/2);           // icon points up at 0 -> align to the arc
     ctx.translate(-size*0.5, -size*0.82);       // pivot at the grip so the head sweeps out
     drawItemIcon(ctx, held.id, size);
     ctx.restore();
     return;
   }
 
-  // Melee (sword / hammer / bare hand): swing toward the cursor. The blade sweeps
-  // MELEE_ARC (135°) and finishes pointing at the aim — so facing/aiming right it
-  // arcs top-down left-to-right, a real directional slash rather than a fixed chop.
-  const e = active ? (1 - (1-t)*(1-t)) : 1;                 // ease-out
-  const aimM = Math.atan2(state.mouse.y - handY, state.mouse.x - handX);
-  const MELEE_ARC = 2.36;                                   // 135°
-  const bladeAng = active ? (aimM - MELEE_ARC + MELEE_ARC*e) : (aimM - MELEE_ARC*0.5);
+  // Melee (sword / hammer / flail): same 225° swing, with a slash-crescent trail.
   if(active && (tool==='sword' || tool==='hammer' || tool==='flail'))
-    drawSlashAim(handX, handY, aimM - MELEE_ARC + MELEE_ARC*Math.max(0,e-0.22), bladeAng, size*0.92, def);
+    drawSlashAim(handX, handY, meleeStart, bladeAng, size*0.92, def);
   ctx.save();
   ctx.translate(handX, handY);
   ctx.rotate(bladeAng + Math.PI/2);           // icon points up at 0 -> align blade to the arc
@@ -240,7 +250,17 @@ function drawFoot(fx,fy,f,col,armored){
   if(armored){ ctx.fillStyle=shade(col,20); ctx.fillRect(fx, fy, 3, 1); }
 }
 function drawPlayer(p, psx, psy){
-  const x=Math.round(psx), y=Math.round(psy), w=p.w, h=p.h;
+  // The body art is authored in a 12x24 frame and scaled to the player's real
+  // size (24x48 = 1.5 x 3 blocks -> a clean 2x), so it stays crisp at any size.
+  const BW=12, BH=24;
+  ctx.save();
+  ctx.translate(Math.round(psx), Math.round(psy));
+  ctx.scale(p.w/BW, p.h/BH);
+  drawPlayerArt(p, BW, BH);
+  ctx.restore();
+}
+function drawPlayerArt(p, w, h){
+  const x=0, y=0;
   const f = p.facing<0 ? -1 : 1;
   const eq = state.equip || {};
   const moving = Math.abs(p.vx)>0.4 && p.onGround;
@@ -269,8 +289,12 @@ function drawPlayer(p, psx, psy){
   const hd = eq.head && ITEMS[eq.head];
   if(hd){ drawArmorHelm(x, headY, w, headH, hd); }
   else {
-    ctx.fillStyle='#ffffff'; ctx.fillRect(x+3, headY+3, 2,2); ctx.fillRect(x+w-5, headY+3, 2,2);
-    ctx.fillStyle='#22314f'; ctx.fillRect(x+3+(f>0?1:0), headY+3, 1,2); ctx.fillRect(x+w-5+(f>0?1:0), headY+3, 1,2);
+    // Face clearly turned toward the way he's walking: both eyes cluster on the
+    // leading half of the head and a little nose pokes out that side.
+    const ex = f>0 ? x+w-6 : x+2;                       // leading edge of the face
+    ctx.fillStyle='#ffffff'; ctx.fillRect(ex, headY+3, 2,2); ctx.fillRect(ex+3, headY+3, 2,2);
+    ctx.fillStyle='#22314f'; ctx.fillRect(ex+(f>0?1:0), headY+3, 1,2); ctx.fillRect(ex+3+(f>0?1:0), headY+3, 1,2);
+    ctx.fillStyle=shade(skin,-24); ctx.fillRect(f>0? x+w-2 : x+1, headY+4, 1, 2); // nose on the facing side
   }
 
   // front arm (sleeve matches chest armor when worn), bobbing with the walk
@@ -344,6 +368,17 @@ function isDrip(tx,ty){ const r=world.grid[ty]; return !!r && r[tx]===DRIPSTONE;
 // per-spike hash) so sizes vary.
 function drawDripstone(tx,ty,sx,sy){
   const g = world.grid;
+  // Backdrop: paint the same cave-wall (or sky) background the surrounding cells
+  // use, so the spike blends into the rock it's on instead of a plain dark box.
+  const surfY = world.surface[tx];
+  if(ty > surfY+1){
+    const depth=ty-surfY, hh=hash2(tx,ty), hh2=hash2(tx*3+1,ty*5+2), light=depth<9;
+    ctx.fillStyle = light ? (hh>0.5?'#4a3320':'#402c1b') : (hh>0.5?'#33333c':'#2b2b33');
+    ctx.fillRect(sx,sy,TILE+1,TILE+1);
+    ctx.fillStyle = light ? '#2f2013' : '#22222b';
+    ctx.fillRect(sx+Math.floor(hh*11), sy+Math.floor(hh2*11), 3,3);
+    if(hh2>0.55) ctx.fillRect(sx+1+Math.floor(hh2*10), sy+1+Math.floor(hh*9), 2,2);
+  }
   const solidAt = (x,y)=>{ const r=g[y]; const t=r&&r[x]; return t!==undefined && t!==AIR && TILES[t] && TILES[t].solid; };
   // find the full vertical run this tile belongs to
   let top=ty; while(isDrip(tx,top-1)) top--;
@@ -549,18 +584,6 @@ function drawBackground(sky){
       ctx.fillStyle = `rgba(255,255,255,${a*tw})`;
       ctx.fillRect(sx, sy, 2, 2);
     }
-    // shooting stars streaking across the night sky (meteor-shower ambiance)
-    for(let k=0;k<3;k++){
-      const ph = (state.time*0.6 + k*1600) % 4200;
-      if(ph<520){
-        const prog=ph/520, ssx=canvas.width*(0.08+k*0.32)+prog*200, ssy=canvas.height*0.10+prog*100+k*24;
-        const al=Math.sin(prog*Math.PI);
-        ctx.strokeStyle=`rgba(255,240,205,${al*0.9})`; ctx.lineWidth=2; ctx.lineCap='round';
-        ctx.beginPath(); ctx.moveTo(ssx,ssy); ctx.lineTo(ssx-18,ssy-9); ctx.stroke();
-        ctx.fillStyle=`rgba(255,255,255,${al})`; ctx.fillRect(ssx-1,ssy-1,2,2);
-      }
-    }
-    ctx.lineWidth=1; ctx.lineCap='butt';
   }
   // sun / moon arcing across the sky
   const phase = night ? (f-0.5)*2 : f*2;
@@ -610,12 +633,32 @@ function drawBackground(sky){
 }
 
 let offCanvas = null;
+// Chunky-8-bit post-process: after the whole frame is drawn, downscale it 2x with
+// nearest-neighbour (no smoothing) then blow it back up 2x. Every art pixel becomes
+// 2x2, so a 16px tile reads as an 8x8 block and smooth curves/glows/circles turn
+// into blocky pixels — a uniform low-res 8-bit look across the entire game.
+let pixCanvas = null, pixCtx = null;
+function pixelateFrame(){
+  const w=canvas.width, h=canvas.height, hw=Math.max(1,w>>1), hh=Math.max(1,h>>1);
+  if(!pixCanvas){ pixCanvas=document.createElement('canvas'); pixCtx=pixCanvas.getContext('2d'); }
+  if(pixCanvas.width!==hw || pixCanvas.height!==hh){ pixCanvas.width=hw; pixCanvas.height=hh; }
+  pixCtx.imageSmoothingEnabled=false;
+  pixCtx.clearRect(0,0,hw,hh);
+  pixCtx.drawImage(canvas, 0,0,w,h, 0,0,hw,hh);   // downscale -> pick every 2nd pixel (sharp/chunky)
+  ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(pixCanvas, 0,0,hw,hh, 0,0,w,h);   // upscale 2x -> 2x2 blocks
+}
 
 export function render(){
   buildAtlas(); // idempotent safety net: guarantees the tile atlas exists before any blit
   const p = state.player;
   state.camX = clamp(p.x - canvas.width/2, 0, WORLD_W*TILE - canvas.width);
   state.camY = clamp(p.y - canvas.height/2, -200, WORLD_H*TILE - canvas.height);
+  // Lock the camera to the 2px pixelation grid so the frame doesn't shimmer /
+  // grass edges don't flicker dark as the world scrolls (the post-process
+  // downscales by 2 — an odd camera offset would resample different sub-pixels).
+  state.camX = Math.round(state.camX/2)*2;
+  state.camY = Math.round(state.camY/2)*2;
 
   const sky = skyColor();
   const grad = ctx.createLinearGradient(0,0,0,canvas.height);
@@ -917,4 +960,6 @@ export function render(){
     ctx.fillStyle = f.color.replace(/[\d.]+\)$/, (a*0.4).toFixed(2)+')');
     ctx.fillRect(0,0,canvas.width,canvas.height);
   }
+
+  pixelateFrame(); // collapse the whole frame to chunky 8-bit pixels
 }

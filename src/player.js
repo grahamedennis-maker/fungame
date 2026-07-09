@@ -29,7 +29,7 @@ export function spawnPlayer(){
   const sx = Math.floor(WORLD_W*0.25);
   const sy = world.surface[sx]-3;
   return {
-    x: sx*TILE, y: sy*TILE, w:11, h:23,
+    x: sx*TILE, y: sy*TILE, w:11, h:23,   // original detailed-player size
     vx:0, vy:0, onGround:false, facing:1,
     hp:180, maxhp:180, invuln:0, hurtCd:0,
   };

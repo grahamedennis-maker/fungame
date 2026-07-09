@@ -80,7 +80,7 @@ function startGame(){
   state.player = spawnPlayer();
   state.inv = new Array(40).fill(null);
   addItem('wood_pickaxe',1);
-  addItem('wood_sword',1);
+  addItem('copper_sword',1);   // copper is the starting weapon
   addItem('torch',5);
   addItem('wood',10);
   state.inv.sort((a,b)=>{ if(a&&!b)return -1; if(!a&&b)return 1; return 0; });

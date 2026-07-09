@@ -23,11 +23,28 @@ function chunk(ctx,color,size){
   ctx.closePath(); ctx.fill();
 }
 
+// A placeable block: a beveled square tile (lit top/left, shaded bottom/right,
+// dark outline) with a little surface texture — reads like a solid block.
+function block(ctx,color,size){
+  const s=size, m=Math.round(s*0.13), w=s-2*m, b=Math.max(1,Math.round(s*0.09));
+  ctx.fillStyle=color; ctx.fillRect(m,m,w,w);
+  ctx.fillStyle=shade(color,30);  ctx.fillRect(m,m,w,b); ctx.fillRect(m,m,b,w);              // lit top/left
+  ctx.fillStyle=shade(color,-34); ctx.fillRect(m,m+w-b,w,b); ctx.fillRect(m+w-b,m,b,w);      // shaded bottom/right
+  ctx.fillStyle=shade(color,-58);                                                            // dark outline
+  ctx.fillRect(m,m,w,1); ctx.fillRect(m,m,1,w); ctx.fillRect(m,m+w-1,w,1); ctx.fillRect(m+w-1,m,1,w);
+  ctx.fillStyle=shade(color,-16); ctx.fillRect(m+Math.round(w*0.32),m+Math.round(w*0.4),Math.max(1,Math.round(s*0.1)),Math.max(1,Math.round(s*0.1)));
+  ctx.fillStyle=shade(color,20);  ctx.fillRect(m+Math.round(w*0.58),m+Math.round(w*0.62),Math.max(1,Math.round(s*0.08)),Math.max(1,Math.round(s*0.08)));
+}
+// An ore chunk: a grey stone block with nuggets of the ore's colour embedded,
+// matching how ore now reads in the world (flecks inside stone).
 function ore(ctx,color,size){
-  chunk(ctx,color,size);
-  ctx.fillStyle = shade(color,80);
-  ctx.fillRect(size*0.6,size*0.5,size*0.06,size*0.06);
-  ctx.fillRect(size*0.4,size*0.62,size*0.05,size*0.05);
+  block(ctx,'#7d7d7d',size);
+  const s=size, m=Math.round(s*0.13), w=s-2*m;
+  const nug=(nx,ny,r)=>{ const x=m+Math.round(w*nx), y=m+Math.round(w*ny), d=Math.max(2,Math.round(s*r));
+    ctx.fillStyle=shade(color,-42); ctx.fillRect(x-1,y-1,d+2,d+2);
+    ctx.fillStyle=color;            ctx.fillRect(x,y,d,d);
+    ctx.fillStyle=shade(color,70);  ctx.fillRect(x,y,Math.max(1,Math.round(s*0.04)),Math.max(1,Math.round(s*0.04))); };
+  nug(0.24,0.26,0.15); nug(0.55,0.52,0.13); nug(0.34,0.62,0.1);
 }
 
 function bar(ctx,color,size){
@@ -70,17 +87,48 @@ function pickaxe(ctx,color,size){
   ctx.restore();
 }
 
-function sword(ctx,color,size){
-  ctx.fillStyle = color;
+// Sword icon modelled on the reference copper sword (drawn pointing up; the
+// held/swing code rotates it): a long metal blade with a dark outline, a bright
+// centre highlight and a lit bevel, a metal crossguard with quillon knobs that
+// matches the blade, an OLIVE wrapped grip, and a blocky metal pommel. `color`
+// tints all the metal so every material (copper/iron/gold…) reads distinct.
+function sword(ctx,color,size,def){
+  const s=size, cx=s*0.5;
+  const dark=shade(color,-46), lit=shade(color,40), hi=shade(color,82);
+  const gy=s*0.60, gh=s*0.075;                       // crossguard
+  // blade outline
+  ctx.fillStyle=dark;
   ctx.beginPath();
-  ctx.moveTo(size*0.5,size*0.05); ctx.lineTo(size*0.62,size*0.56); ctx.lineTo(size*0.38,size*0.56);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = shade(color,-35);
-  ctx.fillRect(size*0.47,size*0.05,size*0.06,size*0.5);
-  ctx.fillStyle = '#8a7a3c';
-  ctx.fillRect(size*0.26,size*0.56,size*0.48,size*0.08);
-  ctx.fillStyle = '#5a3d22';
-  ctx.fillRect(size*0.43,size*0.64,size*0.14,size*0.3);
+  ctx.moveTo(cx, s*0.05); ctx.lineTo(cx+s*0.115, s*0.17); ctx.lineTo(cx+s*0.10, gy);
+  ctx.lineTo(cx-s*0.10, gy); ctx.lineTo(cx-s*0.115, s*0.17); ctx.closePath(); ctx.fill();
+  // blade fill
+  ctx.fillStyle=color;
+  ctx.beginPath();
+  ctx.moveTo(cx, s*0.085); ctx.lineTo(cx+s*0.088, s*0.185); ctx.lineTo(cx+s*0.078, gy-s*0.012);
+  ctx.lineTo(cx-s*0.078, gy-s*0.012); ctx.lineTo(cx-s*0.088, s*0.185); ctx.closePath(); ctx.fill();
+  // lit left bevel
+  ctx.fillStyle=lit;
+  ctx.beginPath();
+  ctx.moveTo(cx, s*0.10); ctx.lineTo(cx, gy-s*0.02); ctx.lineTo(cx-s*0.062, gy-s*0.02);
+  ctx.lineTo(cx-s*0.078, s*0.19); ctx.closePath(); ctx.fill();
+  // bright centre highlight + squared tip glint
+  ctx.fillStyle=hi;
+  ctx.fillRect(cx-Math.max(1,s*0.018), s*0.15, Math.max(1,s*0.03), gy-s*0.22);
+  ctx.fillStyle=lit; ctx.fillRect(cx-s*0.02, s*0.07, s*0.045, s*0.045);
+  // crossguard (metal, matches blade) with quillon knobs
+  ctx.fillStyle=dark;  ctx.fillRect(cx-s*0.27, gy+gh*0.55, s*0.54, gh*0.6);
+  ctx.fillStyle=color; ctx.fillRect(cx-s*0.27, gy, s*0.54, gh);
+  ctx.fillStyle=lit;   ctx.fillRect(cx-s*0.27, gy, s*0.54, Math.max(1,s*0.018));
+  ctx.fillStyle=color; ctx.fillRect(cx-s*0.31, gy+s*0.004, s*0.06, gh-s*0.008);
+  ctx.fillStyle=color; ctx.fillRect(cx+s*0.25, gy+s*0.004, s*0.06, gh-s*0.008);
+  // wrapped grip — colour per weapon (brown by default; copper uses an olive wrap)
+  const grip=(def && def.grip) || '#6a4326', gripD=shade(grip,-34);
+  ctx.fillStyle=grip;  ctx.fillRect(cx-s*0.05, gy+gh, s*0.10, s*0.20);
+  ctx.fillStyle=gripD; for(let yy=gy+gh+s*0.028; yy<gy+gh+s*0.18; yy+=s*0.05) ctx.fillRect(cx-s*0.05, yy, s*0.10, Math.max(1,s*0.016));
+  // blocky metal pommel (matches blade — no circle)
+  ctx.fillStyle=dark;  ctx.fillRect(cx-s*0.06, gy+gh+s*0.20, s*0.12, s*0.06);
+  ctx.fillStyle=color; ctx.fillRect(cx-s*0.05, gy+gh+s*0.205, s*0.10, s*0.05);
+  ctx.fillStyle=lit;   ctx.fillRect(cx-s*0.035, gy+gh+s*0.21, s*0.035, s*0.018);
 }
 
 function trident(ctx,color,size){
@@ -260,6 +308,7 @@ function pick(id, def){
   if(def.tool==='boomerang') return boomerang;
   if(id.endsWith('_bar')) return bar;
   if(id.endsWith('_ore') || id==='coal') return ore;
+  if(def.place) return block;          // placeable blocks (dirt/stone/wood/obsidian/…)
   if(def.glow) return gem;
   return chunk;
 }
@@ -267,7 +316,7 @@ function pick(id, def){
 export function drawItemIcon(ctx, id, size){
   const def = ITEMS[id];
   if(!def) return;
-  pick(id,def)(ctx, def.color, size);
+  pick(id,def)(ctx, def.color, size, def);
 }
 
 export function iconEl(id, size=32){
