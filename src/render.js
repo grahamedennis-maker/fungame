@@ -263,32 +263,26 @@ function isLeaf(tx,ty){ const row=world.grid[ty]; const tt=row?row[tx]:0; return
 function drawFoliage(def, tx, ty, sx, sy){
   const col=def.color, h=hash2(tx,ty), h2=hash2(tx*3+1,ty*5+2);
   const oU=!isLeaf(tx,ty-1), oD=!isLeaf(tx,ty+1), oL=!isLeaf(tx-1,ty), oR=!isLeaf(tx+1,ty);
-  // Fill the tile SOLID so the canopy interior is one continuous leafy mass (no
-  // visible circles). Only the exposed corners are rounded, so the outer edge is
-  // bumpy while interior tiles merge seamlessly with their neighbours.
-  const cTL=oU&&oL, cTR=oU&&oR, cBR=oD&&oR, cBL=oD&&oL;
-  let clipped=false;
-  if(cTL||cTR||cBR||cBL){ ctx.save(); roundTilePath(ctx, sx, sy, TILE+1, 7, cTL, cTR, cBR, cBL); ctx.clip(); clipped=true; }
+  // Solid body so the canopy interior is one continuous leafy mass (no gaps, no
+  // circles), then rounded leafy bulges bulging OUT along the exposed edges so
+  // the outer silhouette is lumpy and scalloped rather than a square block.
   ctx.fillStyle=col; ctx.fillRect(sx,sy,TILE+1,TILE+1);
-  // fine leaf texture: little clusters of lighter/darker specks + a vein or two
+  const bump=(bx,by,r)=>{ ctx.beginPath(); ctx.arc(bx,by,r,0,Math.PI*2); ctx.fill(); };
+  if(oU) for(let i=1;i<=15;i+=4) bump(sx+i, sy,       3+hash2(tx+i,ty)*1.8);
+  if(oD) for(let i=1;i<=15;i+=4) bump(sx+i, sy+TILE,   3+hash2(tx+i,ty+5)*1.8);
+  if(oL) for(let i=1;i<=15;i+=4) bump(sx,    sy+i,     3+hash2(tx,ty+i)*1.8);
+  if(oR) for(let i=1;i<=15;i+=4) bump(sx+TILE, sy+i,   3+hash2(tx+5,ty+i)*1.8);
+  // fine leaf texture: light dapples, dark flecks and a couple of veins
   ctx.fillStyle=shade(col,22);
   ctx.fillRect(sx+2+((h*9)|0),  sy+2+((h2*9)|0), 2,2);
   ctx.fillRect(sx+9+((h2*5)|0), sy+9+((h*5)|0), 1,1);
-  ctx.fillStyle=shade(col,-22);
+  ctx.fillStyle=shade(col,-24);
   ctx.fillRect(sx+4+((h2*8)|0), sy+7+((h*6)|0), 2,2);
   ctx.fillRect(sx+11+((h*3)|0), sy+3+((h2*4)|0), 1,1);
   ctx.fillStyle=shade(col,-32);
   if(h>0.5)  ctx.fillRect(sx+6, sy+5, 1,2);
   if(h2>0.5) ctx.fillRect(sx+10, sy+10, 1,2);
-  if(h*h2>0.8){ ctx.fillStyle='#e05a6a'; ctx.fillRect(sx+7,sy+7,2,2); } // berry
-  if(clipped) ctx.restore();
-  // small pointed leaf tufts poking out along exposed edges (ragged silhouette)
-  ctx.fillStyle=col;
-  const tri=(x,y,ox,oy)=>{ ctx.beginPath(); ctx.moveTo(x-oy,y-ox); ctx.lineTo(x+ox*3,y+oy*3); ctx.lineTo(x+oy,y+ox); ctx.closePath(); ctx.fill(); };
-  if(oU) for(let i=2;i<15;i+=4){ if(hash2(tx*9+i,ty)>0.5) tri(sx+i, sy+1, 0,-1); }
-  if(oD) for(let i=2;i<15;i+=4){ if(hash2(tx*9+i,ty+7)>0.5) tri(sx+i, sy+TILE-1, 0,1); }
-  if(oL) for(let i=2;i<15;i+=4){ if(hash2(tx,ty*9+i)>0.5) tri(sx+1, sy+i, -1,0); }
-  if(oR) for(let i=2;i<15;i+=4){ if(hash2(tx+7,ty*9+i)>0.5) tri(sx+TILE-1, sy+i, 1,0); }
+  if(h*h2>0.82){ ctx.fillStyle='#e05a6a'; ctx.fillRect(sx+7,sy+7,2,2); } // berry
 }
 
 // Overhanging grass blades + the occasional flower, drawn above a surface-exposed
