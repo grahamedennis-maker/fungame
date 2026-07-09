@@ -254,15 +254,30 @@ function drawBark(def, tx, ty, sx, sy){
   const h=hash2(tx,ty);
   if(h>0.82){ ctx.fillStyle=shade(col,-30); ctx.fillRect(x0+4, sy+6, 3,3); ctx.fillStyle=shade(col,12); ctx.fillRect(x0+5, sy+7, 1,1); } // knot
 }
-// Leaves as an overlapping foliage blob so the canopy reads as a smooth organic
-// mass rather than a grid of square clumps.
+function isLeaf(tx,ty){ const row=world.grid[ty]; const tt=row?row[tx]:0; return tt===LEAF||tt===JUNGLELEAF; }
+// Leaves as lumpy, ragged foliage clusters (Terraria-style): an irregular body
+// with pointed leaf tufts poking out along the canopy's exposed edges and
+// internal leaf shading — so the whole canopy reads as an organic leafy mass,
+// not a grid of square (or perfectly round) clumps.
 function drawFoliage(def, tx, ty, sx, sy){
   const col=def.color, cx=sx+8, cy=sy+8;
-  ctx.fillStyle=col; ctx.beginPath(); ctx.arc(cx,cy,9,0,Math.PI*2); ctx.fill(); // blobs merge into neighbours
-  const h=hash2(tx,ty), h2=hash2(tx*3+1, ty*5+2);
-  ctx.fillStyle=shade(col,20);  ctx.beginPath(); ctx.arc(cx-3,cy-3,3.2,0,Math.PI*2); ctx.fill(); // sun highlight
-  ctx.fillStyle=shade(col,-26); ctx.beginPath(); ctx.arc(cx+3,cy+3,2.6,0,Math.PI*2); ctx.fill(); // shadow clump
-  if(h*h2>0.72){ ctx.fillStyle='#e05a6a'; ctx.fillRect(cx-1,cy-1,2,2); }        // berry
+  const h=hash2(tx,ty), h2=hash2(tx*3+1,ty*5+2);
+  const oU=!isLeaf(tx,ty-1), oD=!isLeaf(tx,ty+1), oL=!isLeaf(tx-1,ty), oR=!isLeaf(tx+1,ty);
+  // lumpy body: a main blob + an offset lobe so the silhouette isn't a clean circle
+  ctx.fillStyle=col;
+  ctx.beginPath(); ctx.arc(cx,cy,8+h*2.5,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx+(h2-0.5)*7, cy+(h-0.5)*7, 5.5+h2*2, 0, Math.PI*2); ctx.fill();
+  // ragged pointed leaf tufts along exposed edges only
+  const tri=(x,y,ox,oy)=>{ ctx.beginPath(); ctx.moveTo(x-oy,y-ox); ctx.lineTo(x+ox*3,y+oy*3); ctx.lineTo(x+oy,y+ox); ctx.closePath(); ctx.fill(); };
+  if(oU) for(let i=1;i<15;i+=3){ if(hash2(tx*9+i,ty)>0.45) tri(sx+i, sy+1, 0,-1); }
+  if(oD) for(let i=1;i<15;i+=3){ if(hash2(tx*9+i,ty+7)>0.45) tri(sx+i, sy+TILE-1, 0,1); }
+  if(oL) for(let i=1;i<15;i+=3){ if(hash2(tx,ty*9+i)>0.45) tri(sx+1, sy+i, -1,0); }
+  if(oR) for(let i=1;i<15;i+=3){ if(hash2(tx+7,ty*9+i)>0.45) tri(sx+TILE-1, sy+i, 1,0); }
+  // internal leaf detail: sun highlight, shadow clump, a couple of leaf veins
+  ctx.fillStyle=shade(col,24);  ctx.beginPath(); ctx.arc(cx-3,cy-3,2.6,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=shade(col,-16); ctx.beginPath(); ctx.arc(cx+3,cy+2,2.2,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=shade(col,-30); ctx.fillRect(cx-1,cy+3,1,3); ctx.fillRect(cx+3,cy-2,1,3);
+  if(h*h2>0.72){ ctx.fillStyle='#e05a6a'; ctx.fillRect(cx-1,cy-1,2,2); } // berry
 }
 
 // Overhanging grass blades + the occasional flower, drawn above a surface-exposed
