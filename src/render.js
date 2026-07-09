@@ -267,11 +267,15 @@ function drawFoliage(def, tx, ty, sx, sy){
   // circles), then rounded leafy bulges bulging OUT along the exposed edges so
   // the outer silhouette is lumpy and scalloped rather than a square block.
   ctx.fillStyle=col; ctx.fillRect(sx,sy,TILE+1,TILE+1);
-  const bump=(bx,by,r)=>{ ctx.beginPath(); ctx.arc(bx,by,r,0,Math.PI*2); ctx.fill(); };
-  if(oU) for(let i=1;i<=15;i+=4) bump(sx+i, sy,       3+hash2(tx+i,ty)*1.8);
-  if(oD) for(let i=1;i<=15;i+=4) bump(sx+i, sy+TILE,   3+hash2(tx+i,ty+5)*1.8);
-  if(oL) for(let i=1;i<=15;i+=4) bump(sx,    sy+i,     3+hash2(tx,ty+i)*1.8);
-  if(oR) for(let i=1;i<=15;i+=4) bump(sx+TILE, sy+i,   3+hash2(tx+5,ty+i)*1.8);
+  // directional volume: sunlit toward the top, shadowed underneath
+  if(oU){ ctx.fillStyle=shade(col,20); ctx.fillRect(sx,sy,TILE+1,4); }
+  if(oD){ ctx.fillStyle=shade(col,-26); ctx.fillRect(sx,sy+TILE-4,TILE+1,4); }
+  ctx.fillStyle=col;
+  const bump=(bx,by,r,c)=>{ ctx.fillStyle=c; ctx.beginPath(); ctx.arc(bx,by,r,0,Math.PI*2); ctx.fill(); };
+  if(oU) for(let i=1;i<=15;i+=4) bump(sx+i, sy,       3+hash2(tx+i,ty)*1.8,  shade(col,16));  // lit crown bumps
+  if(oD) for(let i=1;i<=15;i+=4) bump(sx+i, sy+TILE,   3+hash2(tx+i,ty+5)*1.8, shade(col,-24)); // shaded underside bumps
+  if(oL) for(let i=1;i<=15;i+=4) bump(sx,    sy+i,     3+hash2(tx,ty+i)*1.8,  col);
+  if(oR) for(let i=1;i<=15;i+=4) bump(sx+TILE, sy+i,   3+hash2(tx+5,ty+i)*1.8, col);
   // fine leaf texture: light dapples, dark flecks and a couple of veins
   ctx.fillStyle=shade(col,22);
   ctx.fillRect(sx+2+((h*9)|0),  sy+2+((h2*9)|0), 2,2);
