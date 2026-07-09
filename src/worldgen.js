@@ -186,16 +186,25 @@ export function generateWorld(W,H){
       if(grid[y][x]!==AIR) continue;
       const solidUp = solidT(grid[y-1][x]), solidDn = solidT(grid[y+1][x]);
       if(solidUp && !solidDn){                                    // ceiling feature
-        if(chance(0.09)) growSpike(x,y,true, ri(1,4));            // stalactite, length 1–4
+        if(chance(0.09)) growSpike(x,y,true, ri(1,3));            // stalactite, 1–3 tiles (render adds a half-tile tip)
       } else if(solidDn && !solidUp){                             // floor feature
-        if(chance(0.08)) growSpike(x,y,false, ri(1,4));           // stalagmite, length 1–4
+        if(chance(0.08)) growSpike(x,y,false, ri(1,3));           // stalagmite, 1–3 tiles (render adds a half-tile tip)
       }
     }
-    // moss creeping over exposed cave walls — lush caverns are thickly overgrown
-    const mossChance = lush ? 0.34 : 0.10;
+    // Cave-wall variety: creeping moss plus patches of dirt and mud so the walls
+    // read as a real cave instead of bare stone. Lush caverns are a green biome —
+    // thickly overgrown with moss and damp mud.
+    const wall = (x,y) => grid[y-1][x]===AIR||grid[y+1][x]===AIR||grid[y][x-1]===AIR||grid[y][x+1]===AIR;
     for(let x=xa;x<xb;x++) for(let y=ya;y<yb;y++){
-      if(grid[y][x]!==STONE || !chance(mossChance)) continue;
-      if(grid[y-1][x]===AIR||grid[y+1][x]===AIR||grid[y][x-1]===AIR||grid[y][x+1]===AIR) grid[y][x]=MOSS;
+      if(grid[y][x]!==STONE || !wall(x,y)) continue;
+      if(chance(lush ? 0.42 : 0.14)) grid[y][x]=MOSS;                       // moss blocks
+      else if(chance(lush ? 0.16 : 0.10)) grid[y][x]=chance(lush?0.6:0.35)?MUD:DIRT; // dirt/mud pockets
+    }
+    // a few moss/mud blobs deeper in the wall (not just the surface) for depth
+    for(let n=0, cnt=Math.round((xb-xa)*(lush?0.5:0.18)); n<cnt; n++){
+      const bx=ri(xa,xb-1), by=ri(ya,yb-1), t=lush?(chance(0.6)?MOSS:MUD):(chance(0.5)?DIRT:MUD);
+      for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){ const gx=bx+ox,gy=by+oy;
+        if(gx>1&&gx<W-1&&gy>1&&gy<H-1&&grid[gy][gx]===STONE&&chance(0.6)) grid[gy][gx]=t; }
     }
     if(wet){ // water settling on the cavern floor
       const level = Math.floor(cy0 + (cy1-cy0)*0.5);

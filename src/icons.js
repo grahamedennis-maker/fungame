@@ -95,40 +95,39 @@ function pickaxe(ctx,color,size){
 function sword(ctx,color,size,def){
   const s=size, cx=s*0.5;
   const dark=shade(color,-46), lit=shade(color,40), hi=shade(color,82);
-  const gy=s*0.60, gh=s*0.075;                       // crossguard
+  const gy=s*0.62, gh=s*0.06;                        // crossguard (slim sword, ~0.5 block wide)
   // blade outline
   ctx.fillStyle=dark;
   ctx.beginPath();
-  ctx.moveTo(cx, s*0.05); ctx.lineTo(cx+s*0.115, s*0.17); ctx.lineTo(cx+s*0.10, gy);
-  ctx.lineTo(cx-s*0.10, gy); ctx.lineTo(cx-s*0.115, s*0.17); ctx.closePath(); ctx.fill();
+  ctx.moveTo(cx, s*0.05); ctx.lineTo(cx+s*0.072, s*0.15); ctx.lineTo(cx+s*0.062, gy);
+  ctx.lineTo(cx-s*0.062, gy); ctx.lineTo(cx-s*0.072, s*0.15); ctx.closePath(); ctx.fill();
   // blade fill
   ctx.fillStyle=color;
   ctx.beginPath();
-  ctx.moveTo(cx, s*0.085); ctx.lineTo(cx+s*0.088, s*0.185); ctx.lineTo(cx+s*0.078, gy-s*0.012);
-  ctx.lineTo(cx-s*0.078, gy-s*0.012); ctx.lineTo(cx-s*0.088, s*0.185); ctx.closePath(); ctx.fill();
+  ctx.moveTo(cx, s*0.085); ctx.lineTo(cx+s*0.05, s*0.16); ctx.lineTo(cx+s*0.044, gy-s*0.012);
+  ctx.lineTo(cx-s*0.044, gy-s*0.012); ctx.lineTo(cx-s*0.05, s*0.16); ctx.closePath(); ctx.fill();
   // lit left bevel
   ctx.fillStyle=lit;
   ctx.beginPath();
-  ctx.moveTo(cx, s*0.10); ctx.lineTo(cx, gy-s*0.02); ctx.lineTo(cx-s*0.062, gy-s*0.02);
-  ctx.lineTo(cx-s*0.078, s*0.19); ctx.closePath(); ctx.fill();
-  // bright centre highlight + squared tip glint
+  ctx.moveTo(cx, s*0.10); ctx.lineTo(cx, gy-s*0.02); ctx.lineTo(cx-s*0.028, gy-s*0.02);
+  ctx.lineTo(cx-s*0.044, s*0.165); ctx.closePath(); ctx.fill();
+  // bright centre highlight
   ctx.fillStyle=hi;
-  ctx.fillRect(cx-Math.max(1,s*0.018), s*0.15, Math.max(1,s*0.03), gy-s*0.22);
-  ctx.fillStyle=lit; ctx.fillRect(cx-s*0.02, s*0.07, s*0.045, s*0.045);
-  // crossguard (metal, matches blade) with quillon knobs
-  ctx.fillStyle=dark;  ctx.fillRect(cx-s*0.27, gy+gh*0.55, s*0.54, gh*0.6);
-  ctx.fillStyle=color; ctx.fillRect(cx-s*0.27, gy, s*0.54, gh);
-  ctx.fillStyle=lit;   ctx.fillRect(cx-s*0.27, gy, s*0.54, Math.max(1,s*0.018));
-  ctx.fillStyle=color; ctx.fillRect(cx-s*0.31, gy+s*0.004, s*0.06, gh-s*0.008);
-  ctx.fillStyle=color; ctx.fillRect(cx+s*0.25, gy+s*0.004, s*0.06, gh-s*0.008);
+  ctx.fillRect(cx-Math.max(1,s*0.012), s*0.13, Math.max(1,s*0.02), gy-s*0.18);
+  // crossguard (metal, matches blade) with quillon knobs — narrow
+  ctx.fillStyle=dark;  ctx.fillRect(cx-s*0.10, gy+gh*0.55, s*0.20, gh*0.6);
+  ctx.fillStyle=color; ctx.fillRect(cx-s*0.10, gy, s*0.20, gh);
+  ctx.fillStyle=lit;   ctx.fillRect(cx-s*0.10, gy, s*0.20, Math.max(1,s*0.016));
+  ctx.fillStyle=color; ctx.fillRect(cx-s*0.105, gy+s*0.003, s*0.03, gh-s*0.006);
+  ctx.fillStyle=color; ctx.fillRect(cx+s*0.075, gy+s*0.003, s*0.03, gh-s*0.006);
   // wrapped grip — colour per weapon (brown by default; copper uses an olive wrap)
   const grip=(def && def.grip) || '#6a4326', gripD=shade(grip,-34);
-  ctx.fillStyle=grip;  ctx.fillRect(cx-s*0.05, gy+gh, s*0.10, s*0.20);
-  ctx.fillStyle=gripD; for(let yy=gy+gh+s*0.028; yy<gy+gh+s*0.18; yy+=s*0.05) ctx.fillRect(cx-s*0.05, yy, s*0.10, Math.max(1,s*0.016));
+  ctx.fillStyle=grip;  ctx.fillRect(cx-s*0.035, gy+gh, s*0.07, s*0.18);
+  ctx.fillStyle=gripD; for(let yy=gy+gh+s*0.025; yy<gy+gh+s*0.16; yy+=s*0.045) ctx.fillRect(cx-s*0.035, yy, s*0.07, Math.max(1,s*0.014));
   // blocky metal pommel (matches blade — no circle)
-  ctx.fillStyle=dark;  ctx.fillRect(cx-s*0.06, gy+gh+s*0.20, s*0.12, s*0.06);
-  ctx.fillStyle=color; ctx.fillRect(cx-s*0.05, gy+gh+s*0.205, s*0.10, s*0.05);
-  ctx.fillStyle=lit;   ctx.fillRect(cx-s*0.035, gy+gh+s*0.21, s*0.035, s*0.018);
+  ctx.fillStyle=dark;  ctx.fillRect(cx-s*0.05, gy+gh+s*0.18, s*0.10, s*0.05);
+  ctx.fillStyle=color; ctx.fillRect(cx-s*0.04, gy+gh+s*0.185, s*0.08, s*0.04);
+  ctx.fillStyle=lit;   ctx.fillRect(cx-s*0.028, gy+gh+s*0.19, s*0.03, s*0.016);
 }
 
 function trident(ctx,color,size){

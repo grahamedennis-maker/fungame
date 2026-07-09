@@ -152,7 +152,9 @@ function drawHeldTool(p, psx, psy){
   const tool = def && def.tool;
   const t = (performance.now() - state.swingStart) / SWING_DUR;
   const active = t>=0 && t<1;
-  const size = Math.round(p.h*0.95);   // weapon scales with the player's height
+  const isSword = tool==='sword';
+  // swords render at a fixed 41px tall (per spec); other tools scale with the player
+  const size = isSword ? 36 : Math.round(p.h*0.95);   // 36 -> sword renders ~32px (2 blocks) tall
   const handX = psx + p.w/2 + p.facing*Math.round(p.w*0.35), handY = psy + p.h*0.44;
 
   // Bow: aim the weapon toward the cursor with a short recoil kick,
@@ -177,31 +179,32 @@ function drawHeldTool(p, psx, psy){
   // cursor; this is purely the animation.)
   const f = p.facing<0 ? -1 : 1;
   const e = active ? (1 - (1-t)*(1-t)) : 1;                  // ease-out
-  // Shared swing (pickaxe and sword use the SAME animation): a full 225° arc that
-  // winds up behind the head and finishes pointing the way the player faces.
+  // Shared swing (pickaxe AND sword): start behind at 225° when facing right or
+  // 180° when facing left, then sweep over the top to finish horizontal (0°).
   // Screen angles: 0°=right, 90°=down, 180°=left, 270°=up.
-  const SARC = Math.PI*1.25;                                // 225°
-  const endAng = f>0 ? 0 : Math.PI;                         // finish horizontal in facing dir
-  const meleeStart = f>0 ? (endAng - SARC) : (endAng + SARC);
-  const bladeAng = active ? (meleeStart + (endAng - meleeStart)*e) : meleeStart;
+  // One swing shared by pickaxe AND sword. Facing right is authored directly (it's
+  // "perfect"): wind up at 225° behind the head, sweep over the top to 0° and rest
+  // there. Facing left just MIRRORS the whole swing horizontally, so it sweeps the
+  // correct way and the icon faces left — fixing the left-facing bug.
+  const startAng = Math.PI*1.25;                            // 225° wind-up (right-facing)
+  // At rest the tool points 180° (straight behind the player); a swing winds up to
+  // 225° and sweeps over the top to finish with the tip/head at 0° (horizontal).
+  const bladeAng = active ? (startAng + (2*Math.PI - startAng)*e) : Math.PI;
+  const isMelee = tool==='sword' || tool==='hammer' || tool==='flail';
 
-  if(tool==='pick'){
-    ctx.save();
-    ctx.translate(handX, handY);
-    ctx.rotate(bladeAng + Math.PI/2);           // icon points up at 0 -> align to the arc
-    ctx.translate(-size*0.5, -size*0.82);       // pivot at the grip so the head sweeps out
-    drawItemIcon(ctx, held.id, size);
-    ctx.restore();
-    return;
-  }
-
-  // Melee (sword / hammer / flail): same 225° swing, with a slash-crescent trail.
-  if(active && (tool==='sword' || tool==='hammer' || tool==='flail'))
-    drawSlashAim(handX, handY, meleeStart, bladeAng, size*0.92, def);
   ctx.save();
   ctx.translate(handX, handY);
-  ctx.rotate(bladeAng + Math.PI/2);           // icon points up at 0 -> align blade to the arc
-  ctx.translate(-size*0.5, -size*0.82);       // pivot at the grip so the blade sweeps out
+  if(f<0) ctx.scale(-1,1);                     // mirror the whole swing when facing left
+  if(isMelee && active){                        // slash crescent, drawn around the pivot
+    const col=(def&&def.glow)?'#ffffff':(def&&def.color)||'#ffe6a0', R=size*0.92, steps=10;
+    ctx.lineCap='round';
+    for(let i=0;i<steps;i++){ const g0=i/steps, g1=(i+1)/steps;
+      ctx.globalAlpha=0.55*g1*g1; ctx.strokeStyle=col; ctx.lineWidth=1.5+5.5*g1;
+      ctx.beginPath(); ctx.arc(0,0,R, startAng+(bladeAng-startAng)*g0, startAng+(bladeAng-startAng)*g1); ctx.stroke(); }
+    ctx.globalAlpha=1; ctx.lineWidth=1; ctx.lineCap='butt';
+  }
+  ctx.rotate(bladeAng + Math.PI/2);            // icon points up at 0 -> align to the arc
+  ctx.translate(-size*0.5, -size*0.82);        // pivot at the grip so the tip sweeps out
   drawItemIcon(ctx, held.id, size);
   ctx.restore();
 }
@@ -389,18 +392,41 @@ function drawDripstone(tx,ty,sx,sy){
   const girth = 3.5 + Math.min(runLen,4)*0.9 + hash2(tx,top)*2.2; // half-width at the root (px)
   const halfAt = d => Math.max(0.6, girth * Math.pow(1 - d/runLen, 0.8)); // root -> tip taper
   const rootIdx = hanging ? (ty-top) : (bot-ty);   // whole tiles from the wide root
-  let topHalf, botHalf;
-  if(hanging){ topHalf=halfAt(rootIdx); botHalf=halfAt(rootIdx+1); }  // widest at ceiling
-  else        { botHalf=halfAt(rootIdx); topHalf=halfAt(rootIdx+1); } // widest at floor
-  const cxp=sx+8, ty0=sy, by0=sy+TILE+1;
+  const isTip = rootIdx === runLen-1;
+  // Half-tile tip: on multi-tile spikes, half the time the tip ends mid-tile, so
+  // total lengths come out as 1, 1.5, 2, 2.5 or 3 blocks (spikes are 1–3 tiles).
+  const halfTip = isTip && runLen>=2 && hash2(tx,top) < 0.5;
+  const cxp=sx+8;
+  let ty0=sy, by0=sy+TILE+1, topHalf, botHalf;
+  if(hanging){
+    topHalf = halfAt(rootIdx);
+    if(halfTip){ by0 = sy + (TILE>>1); botHalf = halfAt(rootIdx+0.5); }
+    else       { botHalf = halfAt(rootIdx+1); }
+  } else {
+    botHalf = halfAt(rootIdx);
+    if(halfTip){ ty0 = sy + (TILE>>1); topHalf = halfAt(rootIdx+0.5); }
+    else       { topHalf = halfAt(rootIdx+1); }
+  }
+  const hgt = by0 - ty0;
   ctx.fillStyle=base;
   ctx.beginPath();
   ctx.moveTo(cxp-topHalf,ty0); ctx.lineTo(cxp+topHalf,ty0);
   ctx.lineTo(cxp+botHalf,by0); ctx.lineTo(cxp-botHalf,by0);
   ctx.closePath(); ctx.fill();
-  // shaded core + lit edge for a bit of cylindrical volume
-  ctx.fillStyle=shade(base,-24); ctx.fillRect(cxp-1, ty0, 2, TILE+1);
-  ctx.fillStyle=shade(base,24);  ctx.fillRect(cxp-Math.max(topHalf,botHalf)+1, ty0, 1, TILE+1);
+  // --- detail: cylindrical shading, growth bands, speckle, wet tip ---
+  const halfW = yy => topHalf + (botHalf-topHalf)*((yy-ty0)/Math.max(1,hgt));
+  const wmax = Math.max(topHalf, botHalf);
+  ctx.fillStyle=shade(base,30);  ctx.fillRect(cxp-wmax,   ty0, 1, hgt);         // lit left rim
+  ctx.fillStyle=shade(base,16);  ctx.fillRect(cxp-2,      ty0, 1, hgt);         // core sheen
+  ctx.fillStyle=shade(base,-22); ctx.fillRect(cxp+1,      ty0, 1, hgt);         // shadow beside core
+  ctx.fillStyle=shade(base,-34); ctx.fillRect(cxp+wmax-1, ty0, 1, hgt);         // shaded right rim
+  ctx.fillStyle=shade(base,-30);                                               // horizontal growth bands
+  for(const [oy,hh] of [[4,hash2(tx,ty)],[9,hash2(tx*3+1,ty)],[13,hash2(tx,ty*2+5)]]){
+    const yy=ty0+oy; if(hh>0.45 && yy<by0-1){ const hw=halfW(yy); if(hw>1.2) ctx.fillRect(cxp-hw+0.5, yy, hw*2-1, 1); }
+  }
+  const sp=hash2(tx*5+2,ty*3+1);                                                // mineral speckle
+  ctx.fillStyle=shade(base, sp>0.5?22:-28); ctx.fillRect(cxp-1+((sp*3)|0), ty0+2+((sp*(hgt-4))|0), 1,1);
+  if(isTip){ const tipY=hanging? by0-2 : ty0+1; ctx.fillStyle='#cfe0e6'; ctx.fillRect(cxp-1, tipY, 2, 2); } // wet tip drop
 }
 // Glowing cave mushroom (soft light + capped stalk).
 function drawGlowshroom(sx,sy){
@@ -931,7 +957,8 @@ export function render(){
   if(p.invuln>0 && Math.floor(state.time/100)%2===0){ ctx.globalAlpha=0.4; }
   drawPlayer(p, psx, psy);
   ctx.globalAlpha=1;
-  drawHeldTool(p, psx, psy);
+  // (the held weapon is drawn AFTER pixelateFrame so it keeps FINER pixels than
+  // the chunky world/player — see below.)
 
   // darkness overlay when underground (lit by player + torches)
   if(underground){
@@ -962,4 +989,7 @@ export function render(){
   }
 
   pixelateFrame(); // collapse the whole frame to chunky 8-bit pixels
+  // The held weapon is drawn now, on TOP of the pixelated frame, so it keeps full
+  // resolution — its pixels are half the size of the ground/player pixels.
+  drawHeldTool(p, psx, psy);
 }
