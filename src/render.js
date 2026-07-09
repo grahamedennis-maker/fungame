@@ -236,22 +236,22 @@ function isWood(tx,ty){ const row=world.grid[ty]; const tt=row?row[tx]:0; return
 function drawBark(def, tx, ty, sx, sy){
   const col = def.color;
   const wU=isWood(tx,ty-1), wD=isWood(tx,ty+1), wL=isWood(tx-1,ty), wR=isWood(tx+1,ty);
-  if(!wU && !wD && (wL||wR)){                      // horizontal branch / root limb
-    const y0=sy+4, hh=TILE-8;
-    ctx.fillStyle=shade(col,-32); ctx.fillRect(sx, y0-1, TILE+1, hh+2);
-    ctx.fillStyle=col;            ctx.fillRect(sx, y0, TILE+1, hh);
-    ctx.fillStyle=shade(col,20);  ctx.fillRect(sx, y0, TILE+1, 1);
-    ctx.fillStyle=shade(col,-20); ctx.fillRect(sx, y0+hh-1, TILE+1, 1);
+  if(!wU && !wD && (wL||wR)){                      // thin subtle twig (also softens old-world branches)
+    const y0=sy+6;
+    ctx.fillStyle=shade(col,-30); ctx.fillRect(sx, y0-1, TILE+1, 6);
+    ctx.fillStyle=col;            ctx.fillRect(sx, y0, TILE+1, 4);
+    ctx.fillStyle=shade(col,16);  ctx.fillRect(sx, y0, TILE+1, 1);
     return;
   }
-  // vertical trunk: a chunky cylindrical bark column, full-height so it meets the
-  // ground with no gap (only ~1px of background at each side)
-  const x0=sx+1, w=TILE-2;
-  ctx.fillStyle=shade(col,-36); ctx.fillRect(x0-1, sy, w+2, TILE+1);           // dark bark edge
+  // vertical trunk: a rounded ~12px cylindrical bark column with background at
+  // each side and dark rounded edges, so it reads as a round trunk, not a square
+  const x0=sx+2, w=TILE-4;
+  ctx.fillStyle=shade(col,-38); ctx.fillRect(x0-1, sy, 1, TILE+1); ctx.fillRect(x0+w, sy, 1, TILE+1); // rounded dark edges
   ctx.fillStyle=col;            ctx.fillRect(x0, sy, w, TILE+1);
-  ctx.fillStyle=shade(col,24);  ctx.fillRect(x0+2, sy, 2, TILE+1);             // lit side (cylinder)
-  ctx.fillStyle=shade(col,-24); ctx.fillRect(x0+w-3, sy, 2, TILE+1);          // shaded side
-  ctx.fillStyle=shade(col,-14); ctx.fillRect(x0+5, sy, 1, TILE+1); ctx.fillRect(x0+w-6, sy, 1, TILE+1); // bark grain
+  ctx.fillStyle=shade(col,10);  ctx.fillRect(x0+1, sy, 1, TILE+1);
+  ctx.fillStyle=shade(col,26);  ctx.fillRect(x0+2, sy, 2, TILE+1);             // bright lit strip (cylinder)
+  ctx.fillStyle=shade(col,-26); ctx.fillRect(x0+w-2, sy, 2, TILE+1);           // shaded strip
+  ctx.fillStyle=shade(col,-14); ctx.fillRect(x0+6, sy, 1, TILE+1);             // bark grain
   const h=hash2(tx,ty);
   if(h>0.8){ ctx.fillStyle=shade(col,-30); ctx.fillRect(x0+4, sy+6, 3,3); ctx.fillStyle=shade(col,14); ctx.fillRect(x0+5, sy+7, 1,1); } // knot
 }
