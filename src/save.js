@@ -48,6 +48,7 @@ export function saveGame(){
       surface: world.surface,
       dungeons: world.dungeons,
       caves: world.caves,
+      arenas: world.arenas,
       sky: world.sky,
       villager: world.villager,
       relics: world.relics,
@@ -79,6 +80,7 @@ export function loadGame(){
     surface: data.world.surface,
     dungeons: data.world.dungeons || [],
     caves: data.world.caves || [],
+    arenas: data.world.arenas || [],
     sky: data.world.sky || null,
     villager: data.world.villager || null,
     relics: data.world.relics || [],
@@ -98,7 +100,8 @@ export function loadGame(){
   state.bossCooldown = data.bossCooldown;
   // transient runtime arrays never persist; start empty each load
   state.mobs = []; state.projectiles = []; state.particles = [];
-  state.zaps = []; state.waves = []; state.flashes = []; state.bombs = []; state.falling = []; state.meteors = []; state.boss = null;
+  state.zaps = []; state.waves = []; state.flashes = []; state.bombs = []; state.falling = []; state.meteors = []; state.spikes = []; state.boss = null;
+  if(state.player) state.player.stun = 0;
   state.mineHits = new Map();
   return true;
 }

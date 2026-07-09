@@ -33,6 +33,8 @@ export const state = {
   bombs:[],  // live TNT {x,y,vx,vy,fuse}
   falling:[],// live falling blocks {x,y,vy,tile} — dislodged tree wood/leaves
   meteors:[],// live meteor-shower streaks {x,y,vx,vy,strike,life}
+  spikes:[], // ground spikes from the knight boss {x,topY,len,life,max}
+  arenas:[], // boss arenas {x0,y0,w,h,gateX,gateY,gateH,triggered} (set from world at load)
   shopOpen:false,
   msgTimer:0,
 };

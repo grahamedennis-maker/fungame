@@ -68,13 +68,17 @@ export function moveEntity(e, dt){
 
 export function updatePlayer(dt){
   const p = state.player;
+  if(p.stun>0) p.stun -= dt*16.7;             // stunned by the knight's stomp
+  const stunned = p.stun>0;
 
   let ax = 0;
-  if(state.keys['a']||state.keys['arrowleft']){ ax=-1; p.facing=-1; }
-  if(state.keys['d']||state.keys['arrowright']){ ax=1; p.facing=1; }
+  if(!stunned && (state.keys['a']||state.keys['arrowleft'])){ ax=-1; p.facing=-1; }
+  if(!stunned && (state.keys['d']||state.keys['arrowright'])){ ax=1; p.facing=1; }
   // Sprint with Shift for faster movement.
   const sprint = state.keys['shift'];
   p.vx = ax*MOVE_SPEED*(sprint?1.7:1);
+  if(stunned){ moveEntity(p, dt); p.x = clamp(p.x, 0, WORLD_W*TILE-p.w);
+    if(p.hurtCd>0) p.hurtCd-=dt*16.7; if(p.invuln>0) p.invuln-=dt*16.7; return; }
 
   const up = state.keys[' ']||state.keys['w']||state.keys['arrowup'];
   const down = state.keys['s']||state.keys['arrowdown'];

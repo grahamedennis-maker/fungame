@@ -228,21 +228,22 @@ export function generateWorld(W,H){
     // caves start anywhere from just below the surface down to the deep rock,
     // and deeper ones burrow further — so the world has caverns at every depth
     const surfY = surface[clamp(x0,0,W-1)];
-    const deep = chance(0.4);
+    const deep = chance(0.6);                      // most caves burrow deep now
     const lush = chance(0.5);                      // overgrown "lush" cavern — bigger and greener
-    const startY = deep ? ri(surfY+40, H-40) : surfY + ri(10,24);
-    if(startY > H-12) continue;
+    const startY = deep ? ri(surfY+60, H-14) : surfY + ri(10,30);
+    if(startY > H-10) continue;
     let cx = x0, cy = startY;
     let dir = deep ? rand(0,Math.PI*2) : (Math.PI*0.5 + rand(-0.6,0.6)); // shallow caves trend downward
-    const steps = (deep ? ri(70,180) : ri(45,100)) + (lush ? ri(50,110) : 0); // lush caverns sprawl larger
+    const steps = (deep ? ri(130,300) : ri(45,110)) + (lush ? ri(50,110) : 0); // deeper caves burrow much farther
     const baseR = ri(2,4) + (lush ? 1 : 0);        // ...and are more open
     let minCX=cx, maxCX=cx, minCY=cy, maxCY=cy;
     for(let s=0;s<steps;s++){
       dir += rand(-0.5,0.5);
+      if(deep) dir += 0.05;                          // deep caves keep trending downward
       cx += Math.cos(dir)*1.7;
-      cy += Math.sin(dir)*1.3;
+      cy += Math.sin(dir)*1.4;
       cx = clamp(cx, 3, W-4);
-      cy = clamp(cy, surfY+6, H-9);
+      cy = clamp(cy, surfY+6, H-6);                  // may reach nearly to bedrock
       const r = baseR + (chance(0.25)?1:0);
       for(let oy=-r;oy<=r;oy++) for(let ox=-r;ox<=r;ox++){
         if(ox*ox+oy*oy > r*r) continue;
@@ -417,6 +418,29 @@ export function generateWorld(W,H){
     dungeons.push(buildDungeon(dx, dy, dgnThemes[i%dgnThemes.length]));
   }
 
+  // ---- KNIGHT ARENA ----
+  // A big (64x64) sealed stone-brick chamber deep underground. Walk in through the
+  // gate to wake The Fallen Knight; the gate seals until he's beaten. Reached by a
+  // ladder shaft dropped from the surface into an approach tunnel.
+  const arenas = [];
+  function buildKnightArena(x0, y0){
+    const AW=64, AH=64;
+    for(let y=y0;y<y0+AH;y++) for(let x=x0;x<x0+AW;x++){
+      if(x<1||x>=W-1||y<1||y>=H-1) continue;
+      const wall = (x===x0||x===x0+AW-1||y===y0) || (y>=y0+AH-3);   // brick walls + 3-tile floor
+      grid[y][x] = wall ? BRICK : AIR;
+    }
+    const floorTop = y0+AH-3, gateH=5, gateY=floorTop-gateH, gateX=x0;
+    for(let gy=gateY; gy<gateY+gateH; gy++){ grid[gy][gateX]=AIR; grid[gy][gateX-1]=AIR; } // gate opening
+    const tunY = floorTop-1;                              // walk-in level
+    for(let x=x0-16; x<x0; x++){ for(let dy=-4;dy<=0;dy++){ const yy=tunY+dy; if(x>0&&x<W-1&&yy>0&&yy<H-1) grid[yy][x]=AIR; }
+      if(x>0&&x<W-1) grid[tunY+1][x]=BRICK; }              // approach tunnel + floor
+    const shaftX=x0-15, topY=surface[clamp(shaftX,0,W-1)];
+    for(let y=topY-1; y<=tunY; y++){ if(y>0&&y<H-1 && grid[y][shaftX]!==BEDROCK) grid[y][shaftX]=LADDER; } // ladder from surface
+    return { x0, y0, w:AW, h:AH, gateX, gateY, gateH, tag:'knight', triggered:false, cleared:false };
+  }
+  arenas.push(buildKnightArena(Math.round(W*0.5), 150));
+
   // ---- SKY ISLAND ----
   // A floating landmass near the top of the world with a villager shop and
   // a treasure vault, reached by a long cloud staircase rising from the
@@ -487,7 +511,7 @@ export function generateWorld(W,H){
     relics.push({ x:rx, y:ry, item: LEG[ri(0,LEG.length-1)], taken:false });
   }
 
-  return { grid, surface, biomes, dungeons, caves, sky:{x:skyX-Math.floor(skyW/2), y:skyY-2, w:skyW, h:skyH+4}, villager, relics };
+  return { grid, surface, biomes, dungeons, caves, arenas, sky:{x:skyX-Math.floor(skyW/2), y:skyY-2, w:skyW, h:skyH+4}, villager, relics };
 }
 
 /* ---------- WORLD QUERY HELPERS ---------- */

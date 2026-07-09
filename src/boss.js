@@ -1,7 +1,7 @@
-import { TILE, WORLD_W, WORLD_H, ALTAR } from './constants.js';
+import { TILE, WORLD_W, WORLD_H, ALTAR, BRICK, AIR } from './constants.js';
 import { chance, clamp, ri } from './utils.js';
 import { state, world } from './state.js';
-import { tileAt } from './worldgen.js';
+import { tileAt, setTile } from './worldgen.js';
 import { damagePlayer } from './player.js';
 import { spawnParticles } from './particles.js';
 import { addItem } from './inventory.js';
@@ -26,6 +26,16 @@ export const BOSS_TYPES = {
     name:'Glacial Warden', color:'#2b5a7a', chargeColor:'#8fe0ff', eye:'#e8faff',
     w:58, h:54, hp:980, drop:{ frost_core:6, iron_bar:8, coin:120, water_trident:1, nights_edge:1 },
     projColor:'#bfefff', attacks:['iceSpread','summon','blizzard','nova'],
+  },
+  // The Fallen Knight — a huge GROUND boss (6 blocks tall) fought in a sealed
+  // stone-brick arena. He's invulnerable except when his sword is stuck in the
+  // ground and he's straining to pull it out; hit the glowing crack on his back
+  // then. 15 back-hits kill him. Uses hp as the 15-hit counter.
+  knight: {
+    name:'The Fallen Knight', color:'#5b6472', dark:'#333a44', trim:'#8a94a4', eye:'#ff5a4a', crack:'#ff8a3c',
+    w:46, h:94, hp:15, maxhp:15, ground:true,
+    drop:{ coin:250, titanium_bar:8, cobalt_bar:5, meteorite_bar:3, meteorite_sword:1 },
+    projColor:'#c0c8d4',
   },
   // Mini-boss summoned when you claim the relic legendary from its altar.
   guardian: {
@@ -58,6 +68,140 @@ export function spawnMiniBoss(wx, wy){
   msg('⚔ The Relic Guardian rises to reclaim its treasure! ⚔');
 }
 
+/* ---------- THE FALLEN KNIGHT (ground boss) ---------- */
+export function spawnKnight(arena){
+  const def = BOSS_TYPES.knight;
+  const floorY = (arena.y0 + arena.h - 3) * TILE;     // top of the arena floor bricks
+  const cx = (arena.x0 + arena.w/2) * TILE;
+  state.boss = {
+    type:'knight', x: cx + 7*TILE, y: floorY - def.h, w:def.w, h:def.h,
+    hp:def.hp, maxhp:def.maxhp, vx:0, vy:0, facing:-1, t:0,
+    groundY: floorY, onGround:true, arena,
+    mode:'approach', modeTimer:1100, atkCount:0, pullTimer:0, roarTimer:0, backHits:0, shake:0,
+  };
+  document.getElementById('bossname').textContent = def.name;
+  document.getElementById('bosshud').style.display='block';
+  msg('⚔ The Fallen Knight rises! Strike the glowing crack on his back while his sword is stuck. ⚔');
+}
+function knightRect(p, x, y, w, h){ return p.x+p.w>x && p.x<x+w && p.y+p.h>y && p.y<y+h; }
+function knightResetFlags(b){ b.stomped=false; b.spiked=false; b.slammed=false; }
+function knightStartAttack(b, atk){
+  b.pendingAtk = atk; b.mode='wind';
+  b.modeTimer = atk==='slam'?650 : atk==='spikedrag'?720 : 420;
+  knightResetFlags(b);
+}
+function updateKnight(b, def, dt){
+  const p = state.player;
+  b.t = (b.t||0)+dt;
+  const pcx=p.x+p.w/2, bcx=b.x+b.w/2, dx=pcx-bcx;
+  // gravity + rest on the arena floor
+  b.vy += 0.55*dt; b.y += b.vy*dt;
+  if(b.y+b.h >= b.groundY){ b.y=b.groundY-b.h; b.vy=0; b.onGround=true; } else b.onGround=false;
+  b.modeTimer -= dt*16.7;
+  if(b.mode==='approach') b.facing = dx>0?1:-1;      // facing LOCKS once he commits (so you can circle to his back)
+  b.shake = (b.mode==='pull') ? Math.sin(b.t*22)*2 : 0;
+
+  switch(b.mode){
+    case 'approach':
+      b.vx = Math.sign(dx)*Math.min(Math.abs(dx)*0.02, 1.15); b.x += b.vx*dt;
+      if(b.modeTimer<=0){
+        b.atkCount=(b.atkCount||0)+1;
+        const close = Math.abs(dx)<95;
+        let atk = (b.atkCount%3===0) ? 'slam' : (!close ? 'spikedrag' : (chance(0.5)?'stab':'stomp'));
+        knightStartAttack(b, atk);
+      }
+      break;
+    case 'wind':
+      b.vx=0;
+      if(b.modeTimer<=0){ b.mode=b.pendingAtk; b.modeTimer = b.pendingAtk==='stab'?380:b.pendingAtk==='stomp'?320:b.pendingAtk==='spikedrag'?260:220; }
+      break;
+    case 'stab': {                                     // thrust — a low hitbox you can JUMP over
+      b.vx=0; const reach=64, hy=b.y+b.h*0.56, hh=16;
+      const hx = b.facing>0 ? b.x+b.w : b.x-reach;
+      if(knightRect(p,hx,hy,reach,hh)) damagePlayer(20);
+      if(b.modeTimer<=0){ b.mode='recover'; b.modeTimer=480; }
+      break;
+    }
+    case 'stomp':                                      // stomp — stuns the grounded player
+      b.vx=0;
+      if(!b.stomped){ b.stomped=true;
+        state.flashes.push({color:'rgba(120,120,140,0.28)',life:130});
+        for(let i=0;i<18;i++) spawnParticles(bcx+ri(-30,30), b.groundY, '#9aa0ac', 1);
+        if(p.onGround && Math.abs(pcx-bcx)<140){ p.stun=1700; p.vy=-3; msg('Stunned!'); }
+      }
+      if(b.modeTimer<=0){ b.mode='recover'; b.modeTimer=520; }
+      break;
+    case 'spikedrag':                                  // rakes the ground -> a line of 5-block spikes
+      b.vx=0;
+      if(!b.spiked){ b.spiked=true;
+        for(let i=1;i<=6;i++){ const sx=bcx + b.facing*(i*22);
+          state.spikes.push({ x:sx, topY:b.groundY, len:80, life:3000, max:3000, grow:0, delay:i*80 }); }
+        msg('The Knight rakes the ground — spikes erupt!');
+      }
+      if(b.modeTimer<=0){ b.mode='recover'; b.modeTimer=520; }
+      break;
+    case 'slam':                                       // slam sword into ground -> stuck; strain to pull it out
+      b.vx=0;
+      if(!b.slammed){ b.slammed=true;
+        for(let i=0;i<20;i++) spawnParticles(bcx+b.facing*30, b.groundY, '#c0c8d4', 1);
+        state.flashes.push({color:'rgba(160,170,190,0.22)',life:130});
+        b.mode='pull'; b.pullTimer=3500;
+      }
+      break;
+    case 'pull':                                       // 3.5s vulnerable window — hit his back!
+      b.vx=0; b.pullTimer -= dt*16.7;
+      if(b.pullTimer<=0){ for(let i=0;i<12;i++) spawnParticles(bcx, b.y+b.h*0.5, '#c0c8d4', 1); b.mode='approach'; b.modeTimer=1000; knightResetFlags(b); }
+      break;
+    case 'roar': {                                     // 2s roar knockback after a back-hit
+      b.vx=0; b.roarTimer -= dt*16.7;
+      const away = Math.sign(pcx-bcx)||1; p.vx = away*6.5;
+      if(b.roarTimer<=0){ if(b.pullTimer>0) b.mode='pull'; else { b.mode='approach'; b.modeTimer=1000; knightResetFlags(b); } }
+      break;
+    }
+    case 'recover':
+      b.vx=0; if(b.modeTimer<=0){ b.mode='approach'; b.modeTimer=ri(650,1200); knightResetFlags(b); }
+      break;
+  }
+  // keep him inside the arena
+  const ax0=(b.arena.x0+1)*TILE, ax1=(b.arena.x0+b.arena.w-1)*TILE;
+  b.x = clamp(b.x, ax0, ax1-b.w);
+  // walking-into-him contact damage (not while stuck/roaring)
+  if(b.mode!=='pull' && b.mode!=='roar' && b.mode!=='slam' &&
+     Math.abs(bcx-pcx)<b.w/2+6 && p.y+p.h>b.y && p.y<b.y+b.h) damagePlayer(14);
+  document.getElementById('bosshpfill').style.width = (100*b.hp/b.maxhp)+'%';
+}
+
+// Ground spikes (from spikedrag) rise, damage the player, and fade after 3s.
+export function updateSpikes(dt){
+  const p=state.player;
+  for(let i=state.spikes.length-1;i>=0;i--){
+    const s=state.spikes[i];
+    if(s.delay>0){ s.delay-=dt*16.7; continue; }
+    s.life -= dt*16.7;
+    s.grow = Math.min(1, (s.grow||0) + dt*0.12);
+    const topY = s.topY - s.len*s.grow;
+    if(p.x+p.w>s.x-6 && p.x<s.x+6 && p.y+p.h>topY && p.y<s.topY) damagePlayer(12);
+    if(s.life<=0) state.spikes.splice(i,1);
+  }
+}
+
+// Trigger a sealed-arena fight when the player walks inside; shut the gate.
+export function updateArena(dt){
+  if(state.boss || !world) return;
+  const arenas = world.arenas||[];
+  const p=state.player, px=(p.x+p.w/2)/TILE, py=(p.y+p.h/2)/TILE;
+  for(const a of arenas){
+    if(a.triggered || a.cleared) continue;
+    if(px>a.x0+2 && px<a.x0+a.w-2 && py>a.y0+2 && py<a.y0+a.h-2){
+      a.triggered = true;
+      for(let gy=a.gateY; gy<a.gateY+a.gateH; gy++){ setTile(a.gateX,gy,BRICK); setTile(a.gateX-1,gy,BRICK); } // seal the gate
+      state.flashes.push({color:'rgba(0,0,0,0.4)',life:200});
+      msg('The gate slams shut behind you!');
+      spawnKnight(a);
+    }
+  }
+}
+
 // Find the altar tile of the given dungeon (falls back to any altar).
 export function findAltar(tag){
   const dgns = world.dungeons || [];
@@ -71,6 +215,20 @@ export function findAltar(tag){
 
 export function hitBoss(dmg){
   const b = state.boss; if(!b) return;
+  if(b.type==='knight'){
+    // invulnerable unless straining to pull his sword out, and only on his BACK
+    if(b.mode!=='pull'){ spawnParticles(b.x+b.w/2, b.y+b.h*0.5, '#dfe4ec', 3); return; } // clang
+    const p=state.player, side=Math.sign((p.x+p.w/2)-(b.x+b.w/2));
+    if(side !== -b.facing){ spawnParticles(b.x+b.w/2, b.y+b.h*0.4, '#dfe4ec', 2); return; } // not the back
+    b.hp -= 1; b.backHits=(b.backHits||0)+1;
+    const crackX = b.x + (b.facing>0 ? 4 : b.w-4);
+    for(let i=0;i<9;i++) spawnParticles(crackX, b.y+b.h*0.42, BOSS_TYPES.knight.crack, 1);
+    b.roarTimer=2000; b.mode='roar';                    // roar + knockback for 2s
+    state.flashes.push({color:'rgba(255,120,60,0.18)', life:170});
+    msg('The Knight roars! ('+b.backHits+'/15)');
+    if(b.hp<=0) defeatBoss();
+    return;
+  }
   b.hp -= dmg;
   spawnParticles(b.x+b.w/2,b.y+b.h/2, BOSS_TYPES[b.type].projColor,5);
   if(b.hp<=0) defeatBoss();
@@ -84,6 +242,11 @@ export function defeatBoss(){
   const legendary = Object.keys(def.drop).find(k=>k.endsWith('_sword')||k.endsWith('_trident')||k.endsWith('_hammer')||k.endsWith('_bow'));
   if(legendary) msg('You obtained a legendary weapon!');
   spawnParticles(b.x+b.w/2,b.y+b.h/2,'#ffd700',30);
+  if(b.type==='knight' && b.arena){                 // unseal the gate so you can leave
+    const a=b.arena; a.cleared=true; a.triggered=false;
+    for(let gy=a.gateY; gy<a.gateY+a.gateH; gy++){ setTile(a.gateX,gy,AIR); setTile(a.gateX-1,gy,AIR); }
+    state.spikes.length=0;
+  }
   state.boss = null;
   state.bossDefeated = true;
   state.bossCooldown = 20000;
@@ -113,8 +276,11 @@ function startTeleport(b, def){
 }
 
 export function updateBoss(dt){
+  updateArena(dt);
+  updateSpikes(dt);
   if(!state.boss){ if(state.bossCooldown>0) state.bossCooldown -= dt*16.7; return; }
   const b=state.boss, p=state.player, def=BOSS_TYPES[b.type];
+  if(b.type==='knight'){ updateKnight(b, def, dt); return; }
   b.phase = b.hp<b.maxhp*0.35 ? 3 : (b.hp<b.maxhp*0.7 ? 2 : 1);
   const speedMul = b.phase===3?1.9:(b.phase===2?1.35:1);
   const dmgUp = b.phase===3?6:(b.phase===2?3:0);

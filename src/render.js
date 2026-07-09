@@ -150,7 +150,8 @@ function drawHeldTool(p, psx, psy){
   if(!held) return;
   const def = ITEMS[held.id];
   const tool = def && def.tool;
-  const t = (performance.now() - state.swingStart) / SWING_DUR;
+  const swingDur = tool==='sword' ? 1500 : SWING_DUR;   // swords swing over 1.5s
+  const t = (performance.now() - state.swingStart) / swingDur;
   const active = t>=0 && t<1;
   const isSword = tool==='sword';
   // swords render at a fixed 41px tall (per spec); other tools scale with the player
@@ -539,7 +540,50 @@ function roundBlob(x,y,w,h,r){
 
 // Bosses rendered as menacing Terraria-style creatures: a large themed body, a
 // big glowing eye whose pupil tracks the player, and a jagged fanged maw.
+// The Fallen Knight — a tall armoured figure with a greatsword. His back crack
+// glows while he strains to pull his sword out of the ground (his vulnerable window).
+function drawKnightSword(b, x, y, W, H, f, bd){
+  const groundY = b.groundY - state.camY;
+  if(b.mode==='slam'||b.mode==='pull'||b.mode==='roar'){        // planted in the ground out front
+    const px = x + (f>0? W+8 : -10);
+    ctx.fillStyle=shade(bd.color,12); ctx.fillRect(px-2, y+H*0.18, 5, Math.max(4, groundY-(y+H*0.18)+10));
+    ctx.fillStyle=bd.trim;           ctx.fillRect(px-6, y+H*0.18, 13, 4);       // crossguard
+    ctx.fillStyle='#6a4326';         ctx.fillRect(px-1, y+H*0.06, 3, H*0.13);   // grip
+  } else if(b.mode==='spikedrag'){                               // dragged behind at ~45°
+    const bx=x+(f>0?-6:W+6), by=y+H*0.38;
+    ctx.strokeStyle=shade(bd.color,12); ctx.lineWidth=5; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(bx - f*42, groundY); ctx.stroke(); ctx.lineWidth=1; ctx.lineCap='butt';
+  } else {                                                       // held forward
+    const hx=x+(f>0?W-4:4), hy=y+H*0.42, up=(b.mode==='stab'?0:22);
+    ctx.strokeStyle=shade(bd.color,12); ctx.lineWidth=5; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(hx,hy); ctx.lineTo(hx + f*46, hy-up); ctx.stroke(); ctx.lineWidth=1; ctx.lineCap='butt';
+  }
+}
+function drawKnight(b, bd){
+  const shk=b.shake||0;
+  const x=Math.round(b.x-state.camX+shk), y=Math.round(b.y-state.camY), W=b.w, H=b.h, f=b.facing;
+  const metal=bd.color, dark=bd.dark, trim=bd.trim;
+  ctx.fillStyle=dark; ctx.fillRect(x+6, y+H*0.66|0, 10, H*0.34|0); ctx.fillRect(x+W-16, y+H*0.66|0, 10, H*0.34|0); // legs
+  ctx.fillStyle=metal;         ctx.fillRect(x+2, y+H*0.28|0, W-4, H*0.4|0);          // torso
+  ctx.fillStyle=shade(metal,18); ctx.fillRect(x+2, y+H*0.28|0, W-4, 3);
+  ctx.fillStyle=dark;          ctx.fillRect(x+2, (y+H*0.66-3)|0, W-4, 3);
+  ctx.fillStyle=trim;          ctx.fillRect(x-2, y+H*0.28|0, 8, 9); ctx.fillRect(x+W-6, y+H*0.28|0, 8, 9); // pauldrons
+  ctx.fillStyle=shade(metal,-26); ctx.fillRect((x+W/2-1)|0, y+H*0.3|0, 2, H*0.34|0); // chest seam
+  ctx.fillStyle=metal;         ctx.fillRect((x+W/2-9)|0, y+H*0.08|0, 18, H*0.22|0);  // helmet
+  ctx.fillStyle=dark;          ctx.fillRect((x+W/2-9)|0, y+H*0.16|0, 18, 4);         // visor slit
+  ctx.fillStyle=bd.eye;        ctx.fillRect((x+W/2-5)|0, (y+H*0.165)|0, 3,2); ctx.fillRect((x+W/2+2)|0, (y+H*0.165)|0, 3,2);
+  ctx.fillStyle=bd.crack;      ctx.fillRect((x+W/2-2)|0, y+H*0.02|0, 4, H*0.08|0);   // helmet plume
+  if(b.mode==='pull' || b.mode==='roar'){                        // glowing back crack (weak point)
+    const bx = f>0 ? x+3 : x+W-6;
+    drawGlow(ctx, bd.crack, 18, bx+1, y+H*0.46, 1);
+    ctx.fillStyle=bd.crack; ctx.fillRect(bx, y+H*0.3|0, 3, H*0.34|0);
+    ctx.fillStyle='#fff0c0'; ctx.fillRect(bx, (y+H*0.4)|0, 3, 4);
+  }
+  if(b.mode==='roar') drawGlow(ctx, '#ffcaa0', 26, x+W/2+f*18, y+H*0.2, 1);
+  drawKnightSword(b, x, y, W, H, f, bd);
+}
 function drawBoss(b, bd){
+  if(b.type==='knight'){ drawKnight(b, bd); return; }
   const sx=b.x-state.camX, sy=b.y-state.camY, W=b.w, H=b.h;
   const cx=sx+W/2, cy=sy+H/2;
   const p=state.player;
@@ -943,6 +987,19 @@ export function render(){
     ctx.fillStyle='#3a2a1a'; ctx.fillRect(vx+3,vy+1,8,3);        // hair
     ctx.fillStyle='#ffe08a'; ctx.fillRect(vx-3,vy-8,20,7);       // "shop" tag
     ctx.fillStyle='#3a2a1a'; ctx.font='6px monospace'; ctx.fillText('SHOP',vx-2,vy-2);
+  }
+
+  // ground spikes (knight boss)
+  for(const s of state.spikes){
+    if(s.delay>0) continue;
+    const ssx=s.x-state.camX, baseY=s.topY-state.camY, hh=s.len*(s.grow||0);
+    const a=clamp(s.life/400,0,1);
+    ctx.globalAlpha=a;
+    ctx.fillStyle='#7c828c';
+    ctx.beginPath(); ctx.moveTo(ssx-5,baseY); ctx.lineTo(ssx+5,baseY); ctx.lineTo(ssx,baseY-hh); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#c2c8d0';
+    ctx.beginPath(); ctx.moveTo(ssx-1,baseY); ctx.lineTo(ssx+2,baseY-hh*0.7); ctx.lineTo(ssx,baseY-hh); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha=1;
   }
 
   // boss
