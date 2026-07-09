@@ -76,15 +76,17 @@ export function generateWorld(W,H){
         if(xx>0&&xx<W&&yy>0&&yy<H && grid[yy][xx]===AIR && Math.abs(lx)+Math.abs(ly)<=2) grid[yy][xx]=leaf;
       }
     }
-    // big rounded canopy crowning the trunk
-    const topY = sy-th, canopyR = ri(3,4);
-    for(let ly=-canopyR-1; ly<=canopyR-1; ly++) for(let lx=-canopyR; lx<=canopyR; lx++){
-      if(Math.hypot(lx,(ly+1)*1.15) <= canopyR+0.4){
+    // big rounded leafy crown sitting on top of the trunk (Terraria-style)
+    const topY = sy-th, canopyR = ri(4,6);
+    for(let ly=-canopyR-2; ly<=canopyR-1; ly++) for(let lx=-canopyR; lx<=canopyR; lx++){
+      // slightly taller-than-wide, biased upward so the crown rises above the trunk top
+      if(Math.hypot(lx*1.05, (ly+1.2)*0.95) <= canopyR+0.5){
         const yy=topY+ly, xx=x+lx;
         if(xx>=0&&xx<W&&yy>0&&yy<H && grid[yy][xx]===AIR) grid[yy][xx]=leaf;
       }
     }
-    if(topY-1>0 && grid[topY-1][x]===AIR) grid[topY-1][x]=leaf;
+    // a couple of extra leaf tiles filling the neck where trunk meets crown
+    for(let lx=-1;lx<=1;lx++){ const xx=x+lx, yy=topY+1; if(xx>0&&xx<W&&yy<H&&grid[yy][xx]===AIR) grid[yy][xx]=leaf; }
   }
   function placeCactus(x){
     const sy = surface[x], h = ri(2,4);
