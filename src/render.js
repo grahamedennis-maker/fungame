@@ -1,6 +1,6 @@
 import { WORLD_W, WORLD_H, TILE, AIR, DIRT, GRASS, STONE, WOODT, LEAF,
          BRICK, BRICKGLOW, CHEST, ALTAR, TORCH, CRAFT_TABLE, FURNACE, SAND, DUNGFLOOR,
-         LADDER, VINE, TREEWOOD, WATER, DRIPSTONE, GLOWSHROOM, JUNGLELEAF } from './constants.js';
+         LADDER, VINE, TREEWOOD, WATER, DRIPSTONE, GLOWSHROOM, JUNGLELEAF, JUNGLEWOOD } from './constants.js';
 import { clamp, hash2, shade } from './utils.js';
 import { state, world } from './state.js';
 import { TILES, ITEMS } from './tiles.js';
@@ -230,6 +230,41 @@ function drawGlowshroom(sx,sy){
   ctx.fillStyle='#bfffe8'; ctx.fillRect(sx+6,sy+5,1,1); ctx.fillRect(sx+10,sy+6,1,1); // spots
 }
 
+function isWood(tx,ty){ const row=world.grid[ty]; const tt=row?row[tx]:0; return tt===TREEWOOD||tt===JUNGLEWOOD; }
+// Tree trunk/branch rendered as rounded, cylindrically-shaded bark instead of a
+// square block — vertical runs are trunks, horizontal runs are branch limbs.
+function drawBark(def, tx, ty, sx, sy){
+  const col = def.color;
+  const wU=isWood(tx,ty-1), wD=isWood(tx,ty+1), wL=isWood(tx-1,ty), wR=isWood(tx+1,ty);
+  if(!wU && !wD && (wL||wR)){                      // horizontal branch / root limb
+    const y0=sy+4, hh=TILE-8;
+    ctx.fillStyle=shade(col,-32); ctx.fillRect(sx, y0-1, TILE+1, hh+2);
+    ctx.fillStyle=col;            ctx.fillRect(sx, y0, TILE+1, hh);
+    ctx.fillStyle=shade(col,20);  ctx.fillRect(sx, y0, TILE+1, 1);
+    ctx.fillStyle=shade(col,-20); ctx.fillRect(sx, y0+hh-1, TILE+1, 1);
+    return;
+  }
+  // vertical trunk: a rounded column ~12px wide, 2px of background at each side
+  const x0=sx+2, w=TILE-4, topCap=!wU?2:0, botCap=!wD?2:0;
+  ctx.fillStyle=shade(col,-34); ctx.fillRect(x0-1, sy, w+2, TILE+1);           // dark rounded edge
+  ctx.fillStyle=col;            ctx.fillRect(x0, sy+topCap, w, TILE+1-topCap-botCap);
+  ctx.fillStyle=shade(col,22);  ctx.fillRect(x0+2, sy, 2, TILE+1);              // lit side (cylinder)
+  ctx.fillStyle=shade(col,-22); ctx.fillRect(x0+w-3, sy, 2, TILE+1);           // shaded side
+  ctx.fillStyle=shade(col,-14); ctx.fillRect(x0+5, sy, 1, TILE+1);             // bark grain
+  const h=hash2(tx,ty);
+  if(h>0.82){ ctx.fillStyle=shade(col,-30); ctx.fillRect(x0+4, sy+6, 3,3); ctx.fillStyle=shade(col,12); ctx.fillRect(x0+5, sy+7, 1,1); } // knot
+}
+// Leaves as an overlapping foliage blob so the canopy reads as a smooth organic
+// mass rather than a grid of square clumps.
+function drawFoliage(def, tx, ty, sx, sy){
+  const col=def.color, cx=sx+8, cy=sy+8;
+  ctx.fillStyle=col; ctx.beginPath(); ctx.arc(cx,cy,9,0,Math.PI*2); ctx.fill(); // blobs merge into neighbours
+  const h=hash2(tx,ty), h2=hash2(tx*3+1, ty*5+2);
+  ctx.fillStyle=shade(col,20);  ctx.beginPath(); ctx.arc(cx-3,cy-3,3.2,0,Math.PI*2); ctx.fill(); // sun highlight
+  ctx.fillStyle=shade(col,-26); ctx.beginPath(); ctx.arc(cx+3,cy+3,2.6,0,Math.PI*2); ctx.fill(); // shadow clump
+  if(h*h2>0.72){ ctx.fillStyle='#e05a6a'; ctx.fillRect(cx-1,cy-1,2,2); }        // berry
+}
+
 // Overhanging grass blades + the occasional flower, drawn above a surface-exposed
 // grass/snow tile. The tile body/top band is baked into the atlas; only these
 // tufts that poke ABOVE the cell stay a (cheap, surface-only) runtime pass.
@@ -447,6 +482,8 @@ export function render(){
       if(t===WATER){ drawWaterTile(tx,ty,sx,sy); continue; }
       if(t===DRIPSTONE){ drawDripstone(tx,ty,sx,sy); continue; }
       if(t===GLOWSHROOM){ drawGlowshroom(sx,sy); dimLights.push({x:sx+8, y:sy+8}); continue; }
+      if(t===TREEWOOD || t===JUNGLEWOOD){ drawBark(def, tx, ty, sx, sy); continue; }
+      if(t===LEAF || t===JUNGLELEAF){ drawFoliage(def, tx, ty, sx, sy); continue; }
 
       const oL = tileOpen(tx-1,ty), oR = tileOpen(tx+1,ty), oU = tileOpen(tx,ty-1), oD = tileOpen(tx,ty+1);
 

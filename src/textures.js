@@ -103,8 +103,8 @@ const CFG = [
   [DIRT,bakeDirt,4,'hash'], [SAND,bakeSand,4,'hash'],
   [COAL,bakeOre,4,'hash'], [IRON,bakeOre,4,'hash'], [GOLD,bakeOre,4,'hash'], [THORIUM,bakeOre,4,'hash'],
   [GRASS,bakeTop,3,'hash'], [SNOW,bakeTop,3,'hash'], [JUNGLEGRASS,bakeTop,3,'hash'],
-  [WOODT,bakeGrain,3,'hash'], [TREEWOOD,bakeGrain,3,'hash'], [CACTUS,bakeGrain,2,'hash'], [JUNGLEWOOD,bakeGrain,3,'hash'],
-  [MUD,bakeDirt,4,'hash'],
+  [WOODT,bakeGrain,3,'hash'], [CACTUS,bakeGrain,2,'hash'], // placed wood stays a square plank block
+  [MUD,bakeDirt,4,'hash'],                                  // (tree trunks TREEWOOD/JUNGLEWOOD are drawn as round bark, not atlas)
   [BRICK,bakeBrick,2,'row'], [BRICKGLOW,bakeBrick,2,'row'], [DUNGFLOOR,bakeBrick,2,'row'], [SKYBRICK,bakeBrick,2,'row'],
   [CLOUD,bakeDefault,3,'hash'], [ICE,bakeIce,3,'hash'], [MOSS,bakeMoss,4,'hash'],
 ];
