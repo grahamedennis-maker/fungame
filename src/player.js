@@ -2,6 +2,7 @@ import { WORLD_W, WORLD_H, TILE, GRAVITY, MOVE_SPEED, JUMP_VEL, WATER } from './
 import { clamp } from './utils.js';
 import { state, world } from './state.js';
 import { tileAt, tileSolid, tileDef } from './worldgen.js';
+import { totalDefense } from './inventory.js';
 
 const CLIMB_SPEED = 2.2;
 // True when the entity's lower body is submerged in water.
@@ -119,6 +120,8 @@ export function killPlayer(){
 export function damagePlayer(amount){
   const p = state.player;
   if(p.invuln>0) return;
-  p.hp -= amount; p.hurtCd = 1200; p.invuln = 500;
+  // worn armor soaks damage; always leave at least 1 so armor is never total immunity
+  const dmg = Math.max(1, Math.round(amount - totalDefense()));
+  p.hp -= dmg; p.hurtCd = 1200; p.invuln = 500;
   if(p.hp<=0) killPlayer();
 }

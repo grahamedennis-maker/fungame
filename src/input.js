@@ -4,7 +4,7 @@ import { ITEMS } from './tiles.js';
 import { tileAt, setTile, tileDef } from './worldgen.js';
 import { canvas } from './canvas.js';
 import { toggleInv, toggleSettings, toggleShop, renderHotbar } from './ui.js';
-import { hotbarItem, removeItem } from './inventory.js';
+import { hotbarItem, removeItem, equipArmor } from './inventory.js';
 import { screenToWorld, worldToTile, reachOk, tryMob, doAttack, doSpecial, tryAltarInteract, openChest, throwBomb, useConsumable } from './combat.js';
 
 function nearVillager(){
@@ -52,6 +52,8 @@ function handleClick(sx,sy,button){
     // interact with chest / altar when in reach
     if(inReach && tileDef(t).isChest){ openChest(tx,ty); return; }
     if(inReach && tileDef(t).isAltar){ tryAltarInteract(tx,ty); return; }
+    // equip armor
+    if(it && ITEMS[it.id] && ITEMS[it.id].armor){ equipArmor(it.id); renderHotbar(); return; }
     // drink a potion (consumable)
     if(it && ITEMS[it.id] && ITEMS[it.id].heal){ useConsumable(); renderHotbar(); return; }
     // throw TNT toward the cursor (any distance)

@@ -1,5 +1,6 @@
 import { TILES } from './tiles.js';
-import { DIRT, GRASS, STONE, WOODT, COAL, IRON, GOLD, THORIUM, BEDROCK, BRICK,
+import { DIRT, GRASS, STONE, WOODT, COAL, IRON, GOLD, BEDROCK, BRICK,
+         COPPER, TIN, LEAD, SILVER, TUNGSTEN, PLATINUM, OBSIDIAN, COBALT, TITANIUM, METEORITE, METEORDEBRIS,
          BRICKGLOW, SAND, DUNGFLOOR, CLOUD, SKYBRICK, SNOW, ICE, CACTUS,
          JUNGLEGRASS, TREEWOOD, MOSS, MUD, JUNGLEWOOD } from './constants.js';
 import { hash2, fbm, shade } from './utils.js';
@@ -101,7 +102,10 @@ function bakeDefault(g,def,v,id){
 const CFG = [
   [STONE,bakeStone,6,'hash'], [BEDROCK,bakeStone,4,'hash'],
   [DIRT,bakeDirt,4,'hash'], [SAND,bakeSand,4,'hash'],
-  [COAL,bakeOre,4,'hash'], [IRON,bakeOre,4,'hash'], [GOLD,bakeOre,4,'hash'], [THORIUM,bakeOre,4,'hash'],
+  [COAL,bakeOre,4,'hash'], [IRON,bakeOre,4,'hash'], [GOLD,bakeOre,4,'hash'],
+  [COPPER,bakeOre,4,'hash'], [TIN,bakeOre,4,'hash'], [LEAD,bakeOre,4,'hash'], [SILVER,bakeOre,4,'hash'],
+  [TUNGSTEN,bakeOre,4,'hash'], [PLATINUM,bakeOre,4,'hash'], [OBSIDIAN,bakeOre,4,'hash'], [COBALT,bakeOre,4,'hash'],
+  [TITANIUM,bakeOre,4,'hash'], [METEORITE,bakeOre,4,'hash'], [METEORDEBRIS,bakeStone,4,'hash'],
   [GRASS,bakeTop,3,'hash'], [SNOW,bakeTop,3,'hash'], [JUNGLEGRASS,bakeTop,3,'hash'],
   [WOODT,bakeGrain,3,'hash'], [CACTUS,bakeGrain,2,'hash'], // placed wood stays a square plank block
   [MUD,bakeDirt,4,'hash'],                                  // (tree trunks TREEWOOD/JUNGLEWOOD are drawn as round bark, not atlas)

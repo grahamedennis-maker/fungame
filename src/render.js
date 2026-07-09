@@ -9,6 +9,7 @@ import { BOSS_TYPES } from './boss.js';
 import { canvas, ctx } from './canvas.js';
 import { hotbarItem } from './inventory.js';
 import { drawItemIcon } from './icons.js';
+import { MINE_ARC } from './combat.js';
 import { ATLAS_IDS, drawBodyTile, drawEdgeTile, buildAtlas } from './textures.js';
 
 // Cached radial-glow sprites. Building a CanvasGradient + fill for every glowing
@@ -66,6 +67,29 @@ function blendEdge(t, tx, ty, dx, dy){
       else if(side===2) ctx.fillRect(dx, dy+i, d, 2);
       else ctx.fillRect(dx+TILE-d, dy+i, d, 2);
     }
+  }
+}
+// Chunky 8-bit "de-squaring": build an even-odd clip path = full tile rect MINUS
+// pixel-aligned carve rects. Convex corners lose a hash-varied staircase (so the
+// silhouette reads rounded but stays crisply pixelated), and exposed straight
+// edges get little 1–2px bites so long runs of blocks look eroded/organic rather
+// than a perfect grid. All rects are axis-aligned, so edges stay pixel-sharp.
+function carveTilePath(g, x, y, s, oU, oR, oD, oL, tx, ty){
+  g.beginPath();
+  g.rect(x, y, s, s);
+  const H=(a,b)=>hash2(tx*7+a+1, ty*7+b+1);
+  const ksize=(a,b)=>{ const h=H(a,b); return 2 + (h>0.55?1:0) + (h>0.85?1:0); }; // 2..4 px
+  // staircase carves at convex (both-open) corners
+  if(oU&&oL){ const k=ksize(1,1);  for(let i=0;i<k;i++) g.rect(x,           y+i,       k-i, 1); }
+  if(oU&&oR){ const k=ksize(2,1);  for(let i=0;i<k;i++) g.rect(x+s-(k-i),   y+i,       k-i, 1); }
+  if(oD&&oL){ const k=ksize(1,2);  for(let i=0;i<k;i++) g.rect(x,           y+s-1-i,   k-i, 1); }
+  if(oD&&oR){ const k=ksize(2,2);  for(let i=0;i<k;i++) g.rect(x+s-(k-i),   y+s-1-i,   k-i, 1); }
+  // erosion bites along exposed straight edges (kept in the middle, away from corners)
+  for(let j=4;j<=s-6;j+=3){
+    if(oU){ const h=H(j,7);   if(h>0.6) g.rect(x+j, y,       2, h>0.87?2:1); }
+    if(oD){ const h=H(j,13);  if(h>0.6) g.rect(x+j, y+s-(h>0.87?2:1), 2, h>0.87?2:1); }
+    if(oL){ const h=H(3,j);   if(h>0.6) g.rect(x,   y+j,     h>0.87?2:1, 2); }
+    if(oR){ const h=H(19,j);  if(h>0.6) g.rect(x+s-(h>0.87?2:1), y+j, h>0.87?2:1, 2); }
   }
 }
 function roundTilePath(g, x, y, s, r, tl, tr, br, bl){
@@ -139,18 +163,121 @@ function drawHeldTool(p, psx, psy){
     return;
   }
 
-  // Melee (sword / hammer / pick / bare hand): wide overhead arc pivoting at the
-  // grip, eased so it snaps through the middle of the swing.
+  // Pickaxe: swing toward the cursor. The head arcs through MINE_ARC (135°),
+  // finishing in the aim direction — matching the swing-collision mining — instead
+  // of a fixed overhead chop, so it visibly strikes wherever you're digging.
+  if(tool==='pick'){
+    const aim = Math.atan2(state.mouse.y - handY, state.mouse.x - handX);
+    const eP = 1 - (1-t)*(1-t);
+    const headAng = active ? (aim - MINE_ARC + MINE_ARC*eP) : (aim - MINE_ARC*0.5);
+    ctx.save();
+    ctx.translate(handX, handY);
+    ctx.rotate(headAng + Math.PI/2);            // icon points up at 0 -> align head to the arc
+    ctx.translate(-size*0.5, -size*0.82);       // pivot at the grip so the head sweeps out
+    drawItemIcon(ctx, held.id, size);
+    ctx.restore();
+    return;
+  }
+
+  // Melee (sword / hammer / bare hand): swing toward the cursor. The blade sweeps
+  // MELEE_ARC (135°) and finishes pointing at the aim — so facing/aiming right it
+  // arcs top-down left-to-right, a real directional slash rather than a fixed chop.
   const e = active ? (1 - (1-t)*(1-t)) : 1;                 // ease-out
-  const rot = active ? (SWING_START + (SWING_END-SWING_START)*e) : SWING_REST;
-  if(active && (tool==='sword' || tool==='hammer' || tool==='flail')) drawSlash(handX, handY, p.facing, rot, size, def);
+  const aimM = Math.atan2(state.mouse.y - handY, state.mouse.x - handX);
+  const MELEE_ARC = 2.36;                                   // 135°
+  const bladeAng = active ? (aimM - MELEE_ARC + MELEE_ARC*e) : (aimM - MELEE_ARC*0.5);
+  if(active && (tool==='sword' || tool==='hammer' || tool==='flail'))
+    drawSlashAim(handX, handY, aimM - MELEE_ARC + MELEE_ARC*Math.max(0,e-0.22), bladeAng, size*0.92, def);
   ctx.save();
-  ctx.translate(handX,handY);
-  if(p.facing<0) ctx.scale(-1,1);
-  ctx.rotate(rot);
+  ctx.translate(handX, handY);
+  ctx.rotate(bladeAng + Math.PI/2);           // icon points up at 0 -> align blade to the arc
   ctx.translate(-size*0.5, -size*0.82);       // pivot at the grip so the blade sweeps out
   drawItemIcon(ctx, held.id, size);
   ctx.restore();
+}
+// Crescent slash trail drawn in world angles from a0 (trailing) to a1 (blade tip).
+function drawSlashAim(hx, hy, a0, a1, R, def){
+  const col = (def && def.glow) ? '#ffffff' : (def && def.color) || '#ffe6a0';
+  ctx.save(); ctx.translate(hx, hy); ctx.lineCap='round';
+  const steps=10;
+  for(let i=0;i<steps;i++){
+    const f0=i/steps, f1=(i+1)/steps;
+    ctx.globalAlpha = 0.55*f1*f1; ctx.strokeStyle = col; ctx.lineWidth = 1.5 + 5.5*f1;
+    ctx.beginPath(); ctx.arc(0,0,R, a0+(a1-a0)*f0, a0+(a1-a0)*f1); ctx.stroke();
+  }
+  ctx.globalAlpha=1; ctx.lineWidth=1; ctx.lineCap='butt'; ctx.restore();
+}
+
+// The player as a detailed little 8-bit adventurer: skin head with eyes that look
+// the way you face, hair, a tunic torso, a swinging arm, and two legs whose feet
+// stride when you walk. Worn armor pieces overlay the head/torso/feet, each set
+// with its own silhouette (plain band, slit visor, gold crest, spikes, glow-spikes).
+function drawArmorHelm(x,hy,w,hh,item){
+  const c=item.color, st=item.style;
+  ctx.fillStyle=c;             ctx.fillRect(x+1, hy, w-2, hh-2);
+  ctx.fillStyle=shade(c,22);   ctx.fillRect(x+1, hy, w-2, 1);
+  ctx.fillStyle=shade(c,-26);  ctx.fillRect(x+1, hy+hh-3, w-2, 1);
+  ctx.fillStyle='#141110';     ctx.fillRect(x+3, hy+4, w-6, 2);            // eye slit
+  if(st==='visor'){ ctx.fillStyle=shade(c,-34); ctx.fillRect(x+3, hy+3, w-6, 1); }
+  if(st==='crest'){ ctx.fillStyle=shade(c,45);  ctx.fillRect((x+w/2|0)-1, hy-3, 2, 4); } // upright crest
+  if(st==='spike'){ ctx.fillStyle=shade(c,35);  ctx.fillRect(x+2, hy-2, 1,2); ctx.fillRect(x+w-3, hy-2, 1,2); }
+  if(st==='glowspike'){ ctx.fillStyle=item.accent||'#ffd27a'; ctx.fillRect(x+2,hy-3,1,3); ctx.fillRect(x+w-3,hy-3,1,3); ctx.fillRect(x+w/2|0,hy-3,1,3); }
+}
+function drawArmorChest(x,ty,w,th,item){
+  const c=item.color, st=item.style;
+  ctx.fillStyle=c;            ctx.fillRect(x, ty, w, th);
+  ctx.fillStyle=shade(c,22);  ctx.fillRect(x, ty, w, 1);
+  ctx.fillStyle=shade(c,-24); ctx.fillRect(x, ty+th-2, w, 2);
+  ctx.fillStyle=shade(c,14);  ctx.fillRect(x+(w/2|0), ty+1, 1, th-2);      // center ridge
+  if(st==='crest'){ ctx.fillStyle=shade(c,32); ctx.fillRect(x, ty-1, 2,2); ctx.fillRect(x+w-2, ty-1, 2,2); }
+  else if(st==='spike'||st==='glowspike'){ ctx.fillStyle=(st==='glowspike')?(item.accent||'#ffd27a'):shade(c,38);
+    ctx.fillRect(x-1, ty-1, 2,2); ctx.fillRect(x+w-1, ty-1, 2,2); }         // shoulder spikes
+  else { ctx.fillStyle=shade(c,12); ctx.fillRect(x, ty, 2,2); ctx.fillRect(x+w-2, ty, 2,2); } // pauldrons
+}
+function drawFoot(fx,fy,f,col,armored){
+  ctx.fillStyle=shade(col,-14); ctx.fillRect(fx, fy, 3, 2);
+  ctx.fillStyle=col;            ctx.fillRect(f>0? fx+2 : fx-1, fy, 2, 2);   // toe points the way you face
+  if(armored){ ctx.fillStyle=shade(col,20); ctx.fillRect(fx, fy, 3, 1); }
+}
+function drawPlayer(p, psx, psy){
+  const x=Math.round(psx), y=Math.round(psy), w=p.w, h=p.h;
+  const f = p.facing<0 ? -1 : 1;
+  const eq = state.equip || {};
+  const moving = Math.abs(p.vx)>0.4 && p.onGround;
+  const ph = moving ? Math.sin(state.time*0.02) : 0;
+  const stride = Math.round(ph*2);
+  const skin='#e8b078', hair='#4a3016', shirt='#3f6ea0', pants='#33241a', boot='#241a12';
+  const headY=y, headH=8, torsoY=y+8, torsoH=8, legY=y+16, legH=h-16;
+
+  // legs (stride apart when walking) + feet
+  const backLegX = x+2 - (moving?stride:0), frontLegX = x+w-5 + (moving?stride:0);
+  ctx.fillStyle=shade(pants,-16); ctx.fillRect(backLegX, legY, 3, legH-2);
+  ctx.fillStyle=pants;            ctx.fillRect(frontLegX, legY, 3, legH-2);
+  const fd = eq.feet && ITEMS[eq.feet]; const footCol = fd?fd.color:boot;
+  drawFoot(backLegX, legY+legH-2, f, footCol, !!fd);
+  drawFoot(frontLegX, legY+legH-2, f, footCol, !!fd);
+
+  // torso (tunic) + chest armor
+  ctx.fillStyle=shirt; ctx.fillRect(x+1, torsoY, w-2, torsoH);
+  ctx.fillStyle=shade(shirt,-20); ctx.fillRect(x+1, torsoY+torsoH-2, w-2, 2);
+  const cd = eq.chest && ITEMS[eq.chest];
+  if(cd) drawArmorChest(x, torsoY, w, torsoH, cd);
+
+  // head + hair + eyes (pupils shift toward facing); helmet overlay hides the face
+  ctx.fillStyle=skin; ctx.fillRect(x+2, headY+1, w-4, headH-1);
+  ctx.fillStyle=hair; ctx.fillRect(x+2, headY, w-4, 2); ctx.fillRect(x+(f<0?w-3:2), headY, 1, 4);
+  const hd = eq.head && ITEMS[eq.head];
+  if(hd){ drawArmorHelm(x, headY, w, headH, hd); }
+  else {
+    ctx.fillStyle='#ffffff'; ctx.fillRect(x+3, headY+3, 2,2); ctx.fillRect(x+w-5, headY+3, 2,2);
+    ctx.fillStyle='#22314f'; ctx.fillRect(x+3+(f>0?1:0), headY+3, 1,2); ctx.fillRect(x+w-5+(f>0?1:0), headY+3, 1,2);
+  }
+
+  // front arm (sleeve matches chest armor when worn), bobbing with the walk
+  const armX = f>0 ? x+w-2 : x;
+  const armY = torsoY+1 + (moving?Math.round(-ph):0);
+  ctx.fillStyle = cd ? shade(cd.color,-6) : shirt; ctx.fillRect(armX, armY, 2, 4);
+  ctx.fillStyle = skin;                            ctx.fillRect(armX, armY+4, 2, 2);
 }
 
 /* ---------- RENDERING ---------- */
@@ -210,17 +337,35 @@ function drawWaterTile(tx,ty,sx,sy){
 }
 // Dripstone spike — points down as a stalactite (solid ceiling above) or up as a
 // stalagmite (solid floor below).
+function isDrip(tx,ty){ const r=world.grid[ty]; return !!r && r[tx]===DRIPSTONE; }
+// Dripstone renders as a tapered spike that spans however many DRIPSTONE tiles
+// are stacked in its column — so 1-tile stubs stay small and 3–4-tile runs read
+// as long tapering stalactites/stalagmites. Girth scales with run length (plus a
+// per-spike hash) so sizes vary.
 function drawDripstone(tx,ty,sx,sy){
-  const down = !tileOpen(tx,ty-1); // solid above => hanging stalactite
-  ctx.fillStyle = '#6f6a63';
+  const g = world.grid;
+  const solidAt = (x,y)=>{ const r=g[y]; const t=r&&r[x]; return t!==undefined && t!==AIR && TILES[t] && TILES[t].solid; };
+  // find the full vertical run this tile belongs to
+  let top=ty; while(isDrip(tx,top-1)) top--;
+  let bot=ty; while(isDrip(tx,bot+1)) bot++;
+  const runLen = bot-top+1;
+  const hanging = solidAt(tx,top-1) || !solidAt(tx,bot+1); // rooted at ceiling => hangs down
+  const base='#6f6a63';
+  const girth = 3.5 + Math.min(runLen,4)*0.9 + hash2(tx,top)*2.2; // half-width at the root (px)
+  const halfAt = d => Math.max(0.6, girth * Math.pow(1 - d/runLen, 0.8)); // root -> tip taper
+  const rootIdx = hanging ? (ty-top) : (bot-ty);   // whole tiles from the wide root
+  let topHalf, botHalf;
+  if(hanging){ topHalf=halfAt(rootIdx); botHalf=halfAt(rootIdx+1); }  // widest at ceiling
+  else        { botHalf=halfAt(rootIdx); topHalf=halfAt(rootIdx+1); } // widest at floor
+  const cxp=sx+8, ty0=sy, by0=sy+TILE+1;
+  ctx.fillStyle=base;
   ctx.beginPath();
-  if(down){ ctx.moveTo(sx+2,sy); ctx.lineTo(sx+14,sy); ctx.lineTo(sx+8,sy+15); }
-  else    { ctx.moveTo(sx+2,sy+TILE); ctx.lineTo(sx+14,sy+TILE); ctx.lineTo(sx+8,sy+1); }
+  ctx.moveTo(cxp-topHalf,ty0); ctx.lineTo(cxp+topHalf,ty0);
+  ctx.lineTo(cxp+botHalf,by0); ctx.lineTo(cxp-botHalf,by0);
   ctx.closePath(); ctx.fill();
-  ctx.fillStyle = shade('#6f6a63',-22);
-  ctx.fillRect(sx+7, down?sy+2:sy+5, 2, 9);
-  ctx.fillStyle = shade('#6f6a63',26);
-  ctx.fillRect(down?sx+4:sx+9, down?sy+1:sy+4, 2, 4);
+  // shaded core + lit edge for a bit of cylindrical volume
+  ctx.fillStyle=shade(base,-24); ctx.fillRect(cxp-1, ty0, 2, TILE+1);
+  ctx.fillStyle=shade(base,24);  ctx.fillRect(cxp-Math.max(topHalf,botHalf)+1, ty0, 1, TILE+1);
 }
 // Glowing cave mushroom (soft light + capped stalk).
 function drawGlowshroom(sx,sy){
@@ -404,6 +549,18 @@ function drawBackground(sky){
       ctx.fillStyle = `rgba(255,255,255,${a*tw})`;
       ctx.fillRect(sx, sy, 2, 2);
     }
+    // shooting stars streaking across the night sky (meteor-shower ambiance)
+    for(let k=0;k<3;k++){
+      const ph = (state.time*0.6 + k*1600) % 4200;
+      if(ph<520){
+        const prog=ph/520, ssx=canvas.width*(0.08+k*0.32)+prog*200, ssy=canvas.height*0.10+prog*100+k*24;
+        const al=Math.sin(prog*Math.PI);
+        ctx.strokeStyle=`rgba(255,240,205,${al*0.9})`; ctx.lineWidth=2; ctx.lineCap='round';
+        ctx.beginPath(); ctx.moveTo(ssx,ssy); ctx.lineTo(ssx-18,ssy-9); ctx.stroke();
+        ctx.fillStyle=`rgba(255,255,255,${al})`; ctx.fillRect(ssx-1,ssy-1,2,2);
+      }
+    }
+    ctx.lineWidth=1; ctx.lineCap='butt';
   }
   // sun / moon arcing across the sky
   const phase = night ? (f-0.5)*2 : f*2;
@@ -519,12 +676,11 @@ export function render(){
         // the exposed-edge frame overlay. Exposed corners are rounded (clipped)
         // so the terrain silhouette reads organic instead of a hard grid.
         const dx = Math.floor(sx), dy = Math.floor(sy); // integer-align so 16px cells tile seamlessly
-        const cTL=oL&&oU, cTR=oR&&oU, cBR=oR&&oD, cBL=oL&&oD;
         let clipped=false;
-        if(cTL||cTR||cBR||cBL){
+        if(oL||oR||oU||oD){                              // any exposed side -> carve a chunky organic edge
           const surfY=world.surface[tx];
-          if(ty>surfY+1){ ctx.fillStyle=(ty-surfY)<9?'#3f2c1a':'#2f2f38'; ctx.fillRect(dx,dy,TILE+1,TILE+1); } // cave backing behind cut corners
-          ctx.save(); roundTilePath(ctx, dx, dy, TILE+1, 5, cTL, cTR, cBR, cBL); ctx.clip(); clipped=true;
+          if(ty>surfY+1){ ctx.fillStyle=(ty-surfY)<9?'#3f2c1a':'#2f2f38'; ctx.fillRect(dx,dy,TILE+1,TILE+1); } // cave backing behind carved pixels
+          ctx.save(); carveTilePath(ctx, dx, dy, TILE+1, oU, oR, oD, oL, tx, ty); ctx.clip('evenodd'); clipped=true;
         }
         drawBodyTile(ctx, t, tx, ty, dx, dy);
         blendEdge(t, tx, ty, dx, dy); // dither different-type borders so layers bleed together
@@ -641,6 +797,19 @@ export function render(){
     ctx.fillStyle = shade(def.color,-30); ctx.fillRect(bx,by+TILE-2,TILE,2); ctx.fillRect(bx+TILE-2,by,2,TILE);
   }
 
+  // meteor-shower streaks falling toward the world (bright fiery head + trail)
+  for(const m of state.meteors){
+    const sx=m.x-state.camX, sy=m.y-state.camY, sp=Math.hypot(m.vx,m.vy)||1, len=m.strike?26:18;
+    const tx=sx - m.vx/sp*len, ty=sy - m.vy/sp*len;
+    const grd=ctx.createLinearGradient(sx,sy,tx,ty);
+    grd.addColorStop(0, m.strike?'#fff2c0':'#ffddac'); grd.addColorStop(1,'rgba(255,110,40,0)');
+    ctx.strokeStyle=grd; ctx.lineWidth=m.strike?4:2; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(tx,ty); ctx.stroke();
+    drawGlow(ctx, m.strike?'#ffb060':'#ffd9a0', m.strike?14:8, sx, sy, 1);
+    ctx.fillStyle='#fff6d8'; ctx.fillRect(sx-1,sy-1, m.strike?3:2, m.strike?3:2);
+  }
+  ctx.lineWidth=1; ctx.lineCap='butt';
+
   // projectiles (boss/special shots carry their own color)
   for(const pr of state.projectiles){
     ctx.fillStyle = pr.color || '#ffdf80';
@@ -717,10 +886,7 @@ export function render(){
   // player
   const psx = p.x-state.camX, psy = p.y-state.camY;
   if(p.invuln>0 && Math.floor(state.time/100)%2===0){ ctx.globalAlpha=0.4; }
-  ctx.fillStyle = '#e8c07a';
-  ctx.fillRect(psx,psy,p.w,p.h);
-  ctx.fillStyle = '#3a2a1a';
-  ctx.fillRect(psx,psy+p.h-8,p.w,8);
+  drawPlayer(p, psx, psy);
   ctx.globalAlpha=1;
   drawHeldTool(p, psx, psy);
 

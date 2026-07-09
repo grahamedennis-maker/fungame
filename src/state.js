@@ -15,6 +15,7 @@ export const state = {
   bossDefeated:false,
   bossCooldown:0,
   inv:[], // {id,count}
+  equip:{ head:null, chest:null, feet:null }, // worn armor item ids
   hotbarSel:0,
   invOpen:false,
   settingsOpen:false,
@@ -31,6 +32,7 @@ export const state = {
   flashes:[],// full-screen flash visuals {color,life}
   bombs:[],  // live TNT {x,y,vx,vy,fuse}
   falling:[],// live falling blocks {x,y,vy,tile} — dislodged tree wood/leaves
+  meteors:[],// live meteor-shower streaks {x,y,vx,vy,strike,life}
   shopOpen:false,
   msgTimer:0,
 };

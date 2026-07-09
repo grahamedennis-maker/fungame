@@ -1,5 +1,6 @@
 import { WORLD_W, WORLD_H, AIR, DIRT, GRASS, STONE, WOODT, LEAF, COAL, IRON, GOLD,
-         THORIUM, BEDROCK, BRICK, BRICKGLOW, CHEST, ALTAR, DUNGFLOOR, CLOUD, SKYBRICK,
+         COPPER, TIN, LEAD, SILVER, TUNGSTEN, PLATINUM, OBSIDIAN, COBALT, TITANIUM, METEORITE, METEORDEBRIS,
+         BEDROCK, BRICK, BRICKGLOW, CHEST, ALTAR, DUNGFLOOR, CLOUD, SKYBRICK,
          LADDER, VINE, TORCH, SAND, SNOW, ICE, CACTUS, JUNGLEGRASS, TREEWOOD,
          WATER, DRIPSTONE, MOSS, GLOWSHROOM, MUD, JUNGLEWOOD, JUNGLELEAF } from './constants.js';
 import { TILES } from './tiles.js';
@@ -59,17 +60,28 @@ export function generateWorld(W,H){
   }
 
   // ---- FLORA (biome-aware) ----
+  // small blobby leaf clump centred on (cx,cy) with radius r
+  function leafBlob(cx, cy, leaf, r){
+    for(let dy=-r; dy<=r; dy++) for(let dx=-r; dx<=r; dx++){
+      if(dx*dx + dy*dy <= r*r + r){
+        const xx=cx+dx, yy=cy+dy;
+        if(xx>0&&xx<W&&yy>0&&yy<H && grid[yy][xx]===AIR) grid[yy][xx]=leaf;
+      }
+    }
+  }
   function placeTree(x, wood, leaf){
     const sy = surface[x];
-    const style = ri(0,2);                        // 0 round, 1 tall, 2 broad
-    const th = ri(8,13) + (style===1?4:0);        // clean trunk; tall style is much taller
+    const style = ri(0,3);                        // 0 round, 1 tall, 2 broad, 3 tall+bare
+    const th = ri(9,14) + (style===1?4:0) + (style===3?6:0); // trunk height; tall/bare are much taller
     for(let i=1;i<=th;i++){ if(sy-i>0) grid[sy-i][x]=wood; } // trunk runs straight into the ground
-    // big leafy crown seated ON TOP of the trunk, shape varying by style
+    const topY = sy-th;
+    // leafy crown seated ON TOP of the trunk, shape varying by style
     let cRx, cRy;
-    if(style===1){ cRx=ri(3,4); cRy=ri(5,7); }    // tall oval crown
-    else if(style===2){ cRx=ri(6,8); cRy=ri(4,5); } // broad spreading crown
-    else { cRx=ri(5,6); cRy=cRx; }                // round crown
-    const topY = sy-th, cy0 = topY - cRy + 2;     // crown centred above the trunk top (small overlap)
+    if(style===3){ cRx=ri(2,2); cRy=ri(2,3); }    // bare tree: just a small tuft on top
+    else if(style===1){ cRx=ri(2,3); cRy=ri(3,4); }    // tall oval crown
+    else if(style===2){ cRx=ri(4,5); cRy=ri(3,4); }    // broad spreading crown
+    else { cRx=ri(3,4); cRy=cRx; }                      // round crown
+    const cy0 = topY - cRy + 2;                   // crown centred above the trunk top (small overlap)
     for(let ly=-cRy-1; ly<=cRy; ly++) for(let lx=-cRx-1; lx<=cRx+1; lx++){
       const nx=lx/(cRx+0.7), ny=ly/(cRy+0.7);
       if(nx*nx + ny*ny <= 1.0){
@@ -77,12 +89,24 @@ export function generateWorld(W,H){
         if(xx>=0&&xx<W&&yy>0&&yy<H && grid[yy][xx]===AIR) grid[yy][xx]=leaf;
       }
     }
-    // small drooping leaf sprigs dangling just under the crown edges
-    for(const dir of [-1,1]){
-      if(!chance(0.7)) continue;
-      const bx = x + dir*(cRx-1);
-      for(let d=0, n=ri(1,2); d<=n; d++){ const yy=topY+2+d; if(bx>0&&bx<W&&yy<H&&grid[yy][bx]===AIR) grid[yy][bx]=leaf; }
+    // Terraria signature: little leaf clumps on stubby side-branches running up
+    // the exposed trunk, alternating sides. Start below the crown, stop above the
+    // ground, and leave a couple of tiles between clumps so the trunk shows through.
+    let side = chance(0.5) ? 1 : -1;
+    for(let ty = topY + cRy + 2; ty <= sy - 3; ){
+      if(chance(0.6)){
+        const bx = x + side;                              // 1-tile branch stub
+        if(bx>0 && bx<W && grid[ty][bx]===AIR) grid[ty][bx]=wood;
+        leafBlob(bx + side, ty, leaf, chance(0.4)?2:1);   // clump at the branch tip
+        side = -side;                                     // alternate sides
+        ty += ri(3,4);
+      } else ty += 1;
     }
+  }
+  // small standalone bush on the ground (no trunk)
+  function placeShrub(x, leaf){
+    const sy = surface[x];
+    if(sy-1>0 && grid[sy-1][x]===AIR) leafBlob(x, sy-2, leaf, chance(0.5)?2:1);
   }
   function placeCactus(x){
     const sy = surface[x], h = ri(2,4);
@@ -97,10 +121,12 @@ export function generateWorld(W,H){
       if(x-lastTreeX>5 && chance(0.22)){ lastTreeX=x; placeTree(x, TREEWOOD, SNOW); }
     } else {
       const jungle = b==='jungle';
-      const dens = jungle ? 0.44 : 0.36;   // denser woodland — crowns merge into a canopy
-      const gap  = jungle ? 5 : 4;
+      const dens = jungle ? 0.55 : 0.5;    // trees stand apart with sky between crowns
+      const gap  = jungle ? 8 : 9;         // min spacing so distinct rounded crowns don't merge
       if(x-lastTreeX>gap && chance(dens)){ lastTreeX=x;
         if(jungle) placeTree(x, JUNGLEWOOD, JUNGLELEAF); else placeTree(x, TREEWOOD, LEAF); }
+      else if(x-lastTreeX>2 && chance(0.05)){ lastTreeX=x;   // little ground bushes between trees
+        placeShrub(x, jungle?JUNGLELEAF:LEAF); }
       // hanging jungle vines
       if(b==='jungle' && chance(0.10)){
         const sy=surface[x], vl=ri(2,5);
@@ -127,25 +153,61 @@ export function generateWorld(W,H){
     }
   }
 
+  // A meteor crash site: a half-buried ball of charred debris at the surface with
+  // 1–3 precious meteorite blocks locked in its core. Rare — the only meteorite source.
+  function placeMeteor(x){
+    const cx = clamp(x, 6, W-6);
+    const sy = surface[cx];
+    const R = ri(3,5);
+    const cy = sy + R - 1;                    // sink it so the debris mound pokes above ground
+    for(let oy=-R; oy<=R; oy++) for(let ox=-R; ox<=R; ox++){
+      if(ox*ox+oy*oy > R*R) continue;
+      const gx=cx+ox, gy=cy+oy;
+      if(gx<2||gx>=W-2||gy<2||gy>=H-2) continue;
+      if(grid[gy][gx]===BEDROCK) continue;
+      grid[gy][gx]=METEORDEBRIS;
+    }
+    const chunk = ri(1,3);
+    const spots=[[0,0],[1,0],[-1,0],[0,1],[1,1],[-1,1]];
+    for(let i=0;i<chunk;i++){ const [ox,oy]=spots[i]; const gx=cx+ox, gy=cy+oy;
+      if(grid[gy] && grid[gy][gx]===METEORDEBRIS) grid[gy][gx]=METEORITE; }
+  }
+
   // Dress a carved cavern with Terraria-style biome décor: dripstone spikes on
   // ceilings/floors, lush moss + glowing mushrooms in overgrown pockets, and
   // water pooling on the floor of wet caverns.
-  function decorateCave(cx0,cx1,cy0,cy1,deep){
-    const lush = chance(0.4), wet = deep && chance(0.5);
+  function decorateCave(cx0,cx1,cy0,cy1,deep,lush){
+    const wet = chance(deep ? 0.6 : 0.3);   // water pools in most deep caverns, some shallow ones too
     const xa=Math.max(2,cx0), xb=Math.min(W-2,cx1), ya=Math.max(3,cy0), yb=Math.min(H-3,cy1);
+    const solidT = t => t!==AIR && TILES[t] && TILES[t].solid;
+    // Grow a spike of DRIPSTONE of varied length from a ceiling (down) or floor
+    // (up) — this is what gives dripstone its different sizes.
+    const growSpike = (x,y,down,len) => {
+      for(let i=0;i<len;i++){
+        const yy = y + (down? i : -i);
+        if(yy<3 || yy>=H-2 || grid[yy][x]!==AIR) break;
+        grid[yy][x]=DRIPSTONE;
+      }
+    };
     for(let x=xa;x<xb;x++) for(let y=ya;y<yb;y++){
       if(grid[y][x]!==AIR) continue;
-      const up=grid[y-1][x], dn=grid[y+1][x];
-      const solidUp = up!==AIR && TILES[up] && TILES[up].solid;
-      const solidDn = dn!==AIR && TILES[dn] && TILES[dn].solid;
-      if(solidUp && !solidDn && chance(0.06)) grid[y][x]=DRIPSTONE;                       // stalactite
-      else if(solidDn && !solidUp && chance(0.05)) grid[y][x] = (lush && chance(0.45)) ? GLOWSHROOM : DRIPSTONE; // stalagmite / shroom
-    }
-    if(lush){ // moss creeping over exposed cave walls
-      for(let x=xa;x<xb;x++) for(let y=ya;y<yb;y++){
-        if(grid[y][x]!==STONE || !chance(0.14)) continue;
-        if(grid[y-1][x]===AIR||grid[y+1][x]===AIR||grid[y][x-1]===AIR||grid[y][x+1]===AIR) grid[y][x]=MOSS;
+      const solidUp = solidT(grid[y-1][x]), solidDn = solidT(grid[y+1][x]);
+      if(solidUp && !solidDn){                                    // ceiling feature
+        if(lush && chance(0.06)){                                 // lush: dangling vines
+          for(let i=0, n=ri(2,5); i<n; i++){ if(grid[y+i] && grid[y+i][x]===AIR) grid[y+i][x]=VINE; else break; }
+        } else if(chance(0.09)) growSpike(x,y,true, ri(1,4));     // stalactite, length 1–4
+      } else if(solidDn && !solidUp){                             // floor feature
+        if(lush && chance(0.16)){                                 // lush: glowing mushroom clusters
+          grid[y][x]=GLOWSHROOM;
+          if(chance(0.5) && x+1<xb && grid[y][x+1]===AIR && solidT(grid[y+1][x+1])) grid[y][x+1]=GLOWSHROOM;
+        } else if(chance(0.08)) growSpike(x,y,false, ri(1,4));    // stalagmite, length 1–4
       }
+    }
+    // moss creeping over exposed cave walls — lush caverns are thickly overgrown
+    const mossChance = lush ? 0.34 : 0.10;
+    for(let x=xa;x<xb;x++) for(let y=ya;y<yb;y++){
+      if(grid[y][x]!==STONE || !chance(mossChance)) continue;
+      if(grid[y-1][x]===AIR||grid[y+1][x]===AIR||grid[y][x-1]===AIR||grid[y][x+1]===AIR) grid[y][x]=MOSS;
     }
     if(wet){ // water settling on the cavern floor
       const level = Math.floor(cy0 + (cy1-cy0)*0.5);
@@ -170,12 +232,13 @@ export function generateWorld(W,H){
     // and deeper ones burrow further — so the world has caverns at every depth
     const surfY = surface[clamp(x0,0,W-1)];
     const deep = chance(0.4);
+    const lush = chance(0.5);                      // overgrown "lush" cavern — bigger and greener
     const startY = deep ? ri(surfY+40, H-40) : surfY + ri(10,24);
     if(startY > H-12) continue;
     let cx = x0, cy = startY;
     let dir = deep ? rand(0,Math.PI*2) : (Math.PI*0.5 + rand(-0.6,0.6)); // shallow caves trend downward
-    const steps = deep ? ri(70,180) : ri(45,100);
-    const baseR = ri(2,4);
+    const steps = (deep ? ri(70,180) : ri(45,100)) + (lush ? ri(50,110) : 0); // lush caverns sprawl larger
+    const baseR = ri(2,4) + (lush ? 1 : 0);        // ...and are more open
     let minCX=cx, maxCX=cx, minCY=cy, maxCY=cy;
     for(let s=0;s<steps;s++){
       dir += rand(-0.5,0.5);
@@ -199,18 +262,44 @@ export function generateWorld(W,H){
     caves.push({ x0:x0b, x1:x1b, y0:y0b, y1:y1b });
 
     // Extra veins along the cave walls, richer the deeper the cavern runs.
-    scatterOre(COAL, 4, y0b, y1b, 2,5, x0b, x1b);
-    if(y1b>=30) scatterOre(IRON, 3, y0b, y1b, 2,4, x0b, x1b);
-    if(y1b>=55) scatterOre(GOLD, 2, y0b, y1b, 2,3, x0b, x1b);
-    if(y1b>=85) scatterOre(THORIUM, 1, y0b, y1b, 1,3, x0b, x1b);
-    decorateCave(x0b, x1b, y0b, y1b, deep); // dripstone / lush moss+shrooms / water pools
+    // Bonus wall ores, but only ores whose depth band overlaps this cavern — so a
+    // cave's extra veins match the same top-to-bottom layering as the main pass.
+    for(const [tile,seeds,bmin,bmax] of [
+      [COAL,3,24,150],[COPPER,2,26,95],[TIN,2,28,105],[LEAD,2,55,150],[IRON,2,70,180],
+      [SILVER,2,95,205],[TUNGSTEN,1,115,225],[GOLD,1,125,245],[PLATINUM,1,150,265],
+      [OBSIDIAN,1,185,305],[COBALT,1,205,314],[TITANIUM,1,225,315]]){
+      const lo=Math.max(y0b,bmin), hi=Math.min(y1b,bmax);
+      if(hi>lo+1) scatterOre(tile, seeds, lo, hi, 1,3, x0b, x1b);
+    }
+    decorateCave(x0b, x1b, y0b, y1b, deep, lush); // dripstone / lush moss+shrooms / water pools
   }
 
-  // Ore counts scale with world size so a giant world isn't barren.
-  scatterOre(COAL,   Math.round(W*0.28), 24, H-8, 3, 7);
-  scatterOre(IRON,   Math.round(W*0.10), 30, H-6, 2, 5);
-  scatterOre(GOLD,   Math.round(W*0.05), 55, H-6, 2, 4);
-  scatterOre(THORIUM,Math.round(W*0.022), 85, H-5, 1, 3);
+  // Ores are spread through the layers by depth BAND rather than piling at the
+  // bottom: coal + copper + tin dominate the shallows, each metal then owns its own
+  // band deeper down, and obsidian/cobalt/titanium sit at the very bottom — rarer
+  // (fewer seeds, smaller veins) the deeper they go.
+  scatterOre(COAL, Math.round(W*0.24), 24, 150, 3, 7);   // coal: shallow-to-mid, common
+  //         tile       density       minY  maxY  veinMin veinMax
+  const ORES = [
+    [COPPER,   0.110,  26,  95, 2, 6],   // top layers
+    [TIN,      0.085,  28, 105, 2, 5],   // top layers
+    [LEAD,     0.060,  55, 150, 2, 5],
+    [IRON,     0.052,  70, 180, 2, 5],
+    [SILVER,   0.040,  95, 205, 2, 4],
+    [TUNGSTEN, 0.030, 115, 225, 2, 4],
+    [GOLD,     0.024, 125, 245, 2, 4],
+    [PLATINUM, 0.017, 150, 265, 1, 3],
+    [OBSIDIAN, 0.012, 185, 305, 2, 4],   // bottom layers, rare
+    [COBALT,   0.009, 205, 314, 1, 3],   // bottom layers, rare
+    [TITANIUM, 0.006, 225, 315, 1, 3],   // deepest, rarest
+  ];
+  for(const [tile, dens, minY, maxY, vmin, vmax] of ORES){
+    scatterOre(tile, Math.round(W*dens), minY, maxY, vmin, vmax);
+  }
+
+  // Meteors: rare crash sites of charred debris, each hiding 1–3 meteorite blocks.
+  const numMeteors = Math.max(1, Math.round(W/2200));
+  for(let m=0;m<numMeteors;m++) placeMeteor(ri(20, W-20));
 
   // Each dungeon is a cluster of open, walkable chambers linked by wide
   // carved tunnels. Rooms are hollow boxes (glowing brick walls, a floor
@@ -417,3 +506,26 @@ export function setTile(tx,ty,v){
 }
 export function tileDef(id){ return TILES[id] || TILES[AIR]; }
 export function tileSolid(id){ return !!tileDef(id).solid; }
+
+// Runtime meteor strike: drop a fresh debris crater with 1–3 meteorite blocks at
+// column cx on the LIVE world (used by the night-time meteor shower). Mirrors the
+// worldgen placeMeteor but writes through world.grid + updates surface[].
+export function strikeMeteor(cx){
+  if(!world) return;
+  cx = clamp(cx, 6, WORLD_W-6);
+  const sy = world.surface[cx];
+  const R = ri(3,5), cy = sy + R - 1;
+  for(let oy=-R; oy<=R; oy++) for(let ox=-R; ox<=R; ox++){
+    if(ox*ox+oy*oy > R*R) continue;
+    const gx=cx+ox, gy=cy+oy;
+    if(gx<2||gx>=WORLD_W-2||gy<2||gy>=WORLD_H-2) continue;
+    if(world.grid[gy][gx]===BEDROCK) continue;
+    world.grid[gy][gx] = (oy < -R+2 && world.grid[gy][gx]===AIR) ? AIR : METEORDEBRIS;
+  }
+  const chunk = ri(1,3), spots=[[0,0],[1,0],[-1,0],[0,1],[1,1],[-1,1]];
+  for(let i=0;i<chunk;i++){ const [ox,oy]=spots[i]; const gx=cx+ox, gy=cy+oy;
+    if(world.grid[gy] && world.grid[gy][gx]===METEORDEBRIS) world.grid[gy][gx]=METEORITE; }
+  // raise the surface line so the debris mound reads as terrain (lighting/darkness)
+  for(let ox=-R; ox<=R; ox++){ const gx=cx+ox; if(gx>1&&gx<WORLD_W-1){
+    for(let y=Math.max(1,cy-R); y<=cy+R; y++){ if(tileSolid(world.grid[y][gx])){ if(y<world.surface[gx]) world.surface[gx]=y; break; } } } }
+}

@@ -44,6 +44,25 @@ export function removeItem(id,count){
 }
 export function hotbarItem(){ return state.inv[state.hotbarSel]; }
 
+/* ---------- ARMOR ---------- */
+// Equip an armor item into its slot; any piece already worn there returns to the
+// inventory. Right-clicking a worn-slot's item swaps it out.
+export function equipArmor(id){
+  const def = ITEMS[id];
+  if(!def || !def.armor) return;
+  const prev = state.equip[def.slot];
+  removeItem(id, 1);
+  state.equip[def.slot] = id;
+  if(prev) addItem(prev, 1);           // send the old piece back to the bag
+  msg('Equipped '+def.name);
+  renderInvUI();
+}
+export function totalDefense(){
+  let d=0;
+  for(const slot in state.equip){ const id=state.equip[slot]; if(id && ITEMS[id]) d += (ITEMS[id].defense||0); }
+  return d;
+}
+
 /* ---------- CRAFTING ---------- */
 export function nearStation(kind){
   const p = state.player;

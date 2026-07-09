@@ -55,6 +55,7 @@ export function saveGame(){
     },
     player: state.player,
     inv: state.inv,
+    equip: state.equip,
     hotbarSel: state.hotbarSel,
     time: state.time,
     bossDefeated: state.bossDefeated,
@@ -86,13 +87,18 @@ export function loadGame(){
   // Drop any items that no longer exist in this build (e.g. removed weapons) so
   // stale saves can't crash the inventory/hotbar UI on render.
   state.inv = Array.isArray(data.inv) ? data.inv.map(s => (s && ITEMS[s.id]) ? s : null) : [];
+  // restore worn armor, dropping any pieces that no longer exist in this build
+  const eq = data.equip || {};
+  state.equip = { head:(eq.head&&ITEMS[eq.head])?eq.head:null,
+                  chest:(eq.chest&&ITEMS[eq.chest])?eq.chest:null,
+                  feet:(eq.feet&&ITEMS[eq.feet])?eq.feet:null };
   state.hotbarSel = data.hotbarSel;
   state.time = data.time;
   state.bossDefeated = data.bossDefeated;
   state.bossCooldown = data.bossCooldown;
   // transient runtime arrays never persist; start empty each load
   state.mobs = []; state.projectiles = []; state.particles = [];
-  state.zaps = []; state.waves = []; state.flashes = []; state.bombs = []; state.falling = []; state.boss = null;
+  state.zaps = []; state.waves = []; state.flashes = []; state.bombs = []; state.falling = []; state.meteors = []; state.boss = null;
   state.mineHits = new Map();
   return true;
 }

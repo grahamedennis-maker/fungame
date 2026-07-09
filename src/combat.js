@@ -1,8 +1,8 @@
-import { TILE, REACH, AIR, ALTAR, COAL, IRON, GOLD, THORIUM, WORLD_H, BEDROCK,
+import { TILE, REACH, AIR, ALTAR, WORLD_W, WORLD_H, BEDROCK,
          TREEWOOD, LEAF, JUNGLEWOOD, JUNGLELEAF } from './constants.js';
 import { clamp, ri, chance } from './utils.js';
 import { state, world } from './state.js';
-import { tileAt, setTile, tileDef, tileSolid } from './worldgen.js';
+import { tileAt, setTile, tileDef, tileSolid, strikeMeteor } from './worldgen.js';
 import { ITEMS } from './tiles.js';
 import { hotbarItem, addItem, removeItem, countItem } from './inventory.js';
 import { spawnParticles } from './particles.js';
@@ -247,7 +247,12 @@ export function doSpecial(){
   }
 }
 
-const MINE_SWING = 240; // ms per pickaxe swing (matches the visual swing)
+const MINE_SWING = 240;            // ms per pickaxe swing (matches the visual swing)
+export const MINE_ARC = Math.PI*0.75; // 135° sweep the pick head arcs through, ending at the aim
+
+// Tree material — trunks, branches (also wood), and foliage. Chopped slower than
+// ground and never swept up by the pickaxe's multi-block dig line.
+export const isTreeTile = t => t===TREEWOOD || t===JUNGLEWOOD || t===LEAF || t===JUNGLELEAF;
 
 // Chip one block: accrue swing damage, break it (and drop/collapse) when done.
 function strikeTile(tx, ty, tool, hx, hy){
@@ -256,11 +261,11 @@ function strikeTile(tx, ty, tool, hx, hy){
   if(!reachOk(tx,ty)) return;
   if(def.tier>0 && tool.tier<def.tier) return; // need a stronger pickaxe
   const key = tx+','+ty;
-  const need = def.hardness*15;
+  const need = def.hardness*15 * (isTreeTile(t) ? 2.2 : 1); // trees take longer to chop
   const prog = (state.mineHits.get(key)||0) + tool.power*dt_cache*2.6;
   if(prog>=need){
     if(def.drop) addItem(def.drop,1);
-    if(t===COAL||t===IRON||t===GOLD||t===THORIUM) msg('Found '+def.name+'!');
+    if(def.ore) msg('Found '+def.name+'!');
     setTile(tx,ty,AIR);
     dislodgeAbove(tx,ty); // tree wood/leaves above lose support and fall
     state.mineHits.delete(key);
@@ -289,20 +294,48 @@ export function updateMining(dt){
   // right NEXT TO the character — you can't mine a distant block through others.
   const cwx = state.mouse.x+state.camX, cwy = state.mouse.y+state.camY;
   const aim = Math.atan2(cwy-handY, cwx-handX);
-  const t = clamp((performance.now()-state.swingStart)/MINE_SWING, 0, 1);
-  const reach = TILE*1.6;                       // adjacent tiles only
-  const sweep = aim + (-0.5 + 1.0*t);           // the pick-head arcs across the aim as it swings
-  const headX = handX + Math.cos(sweep)*reach, headY = handY + Math.sin(sweep)*reach;
-  const aimX  = handX + Math.cos(aim)*reach,   aimY  = handY + Math.sin(aim)*reach;
-
-  // the adjacent block straight along the aim + the one the swept pick-head sweeps over
-  strikeTile(Math.floor(aimX/TILE),  Math.floor(aimY/TILE),  tool, aimX,  aimY);
-  strikeTile(Math.floor(headX/TILE), Math.floor(headY/TILE), tool, headX, headY);
-
   const now = performance.now();
+  const t = clamp((now-state.swingStart)/MINE_SWING, 0, 1);
+
+  // Digging straight down mines only the single block directly beneath you — no
+  // wedge — so you can sink a clean 1-wide shaft without gouging the sides.
+  const downward = Math.sin(aim) > 0.78;   // aim within ~40° of straight down
+  if(downward){
+    const bx = handX + Math.cos(aim)*TILE*1.4, by = handY + Math.sin(aim)*TILE*1.4;
+    strikeTile(Math.floor(bx/TILE), Math.floor(by/TILE), tool, bx, by);
+  } else {
+    // Swing-collision mining: the pick head sweeps a ~135° arc finishing in the aim
+    // direction. Every GROUND tile (ore/stone/dirt — never wood or trees) the arc
+    // has swept through so far this swing keeps taking hits, so a full swing clears
+    // the wedge it collides with in the direction you're hitting. Sampled across the
+    // swept angle and a few depths to give the wedge width and thickness.
+    const seen = new Set();
+    const startAng = aim - MINE_ARC;
+    const leadAng  = startAng + MINE_ARC*t;               // how far the head has swept this frame
+    const ASTEPS = 8;
+    for(let s=0; s<=ASTEPS; s++){
+      const a = startAng + (leadAng-startAng)*(s/ASTEPS);
+      for(const rd of [1.1, 1.7, 2.3]){
+        const dist = TILE*rd;
+        const hx = handX + Math.cos(a)*dist, hy = handY + Math.sin(a)*dist;
+        const tx = Math.floor(hx/TILE), ty = Math.floor(hy/TILE);
+        const k = tx+','+ty; if(seen.has(k)) continue; seen.add(k);
+        if(isTreeTile(tileAt(tx,ty))) continue;            // the swing never chews wood/leaves
+        strikeTile(tx, ty, tool, hx, hy);
+      }
+    }
+    // Pointing directly at a tree still chops it (one slow block at a time) — the
+    // aim ray is sampled at the nearest couple of tiles so close trunks register.
+    for(const rd of [1.1, 1.7]){
+      const ax = handX + Math.cos(aim)*TILE*rd, ay = handY + Math.sin(aim)*TILE*rd;
+      if(isTreeTile(tileAt(Math.floor(ax/TILE), Math.floor(ay/TILE))))
+        { strikeTile(Math.floor(ax/TILE), Math.floor(ay/TILE), tool, ax, ay); break; }
+    }
+  }
+
   if(now - state.swingStart > MINE_SWING) state.swingStart = now; // keep swinging
   // heal blocks that aren't currently being struck so progress doesn't linger
-  for(const [k,v] of state.mineHits){ const nv=v-dt*1.1; if(nv<=0) state.mineHits.delete(k); else state.mineHits.set(k,nv); }
+  for(const [k,v] of state.mineHits){ const nv=v-dt*0.35; if(nv<=0) state.mineHits.delete(k); else state.mineHits.set(k,nv); }
 }
 
 /* ---------- FALLING BLOCKS (Terraria-style tree collapse) ---------- */
@@ -310,14 +343,61 @@ export function updateMining(dt){
 // trunks (TREEWOOD) and leaves fall — wood the player places to build (WOODT)
 // stays put, so structures don't collapse.
 const FALLABLE = new Set([TREEWOOD, LEAF, JUNGLEWOOD, JUNGLELEAF]);
-// When a tile is cleared, detach the contiguous run of fallable tiles directly
-// above it into free-falling blocks (each becomes a live physics entity).
+// When a tile is cleared, the entire connected tree resting on top of it comes
+// down: flood-fill the attached fallable region (trunk + branches + leaves) from
+// just above the gap. Wood tumbles as physics blocks (so it still drops wood);
+// leaves burst into particles. The gap itself is AIR, so the fill climbs up and
+// out through the crown without descending the stump below the cut.
 export function dislodgeAbove(tx,ty){
-  for(let y=ty-1; y>0; y--){
-    const t = tileAt(tx,y);
-    if(!FALLABLE.has(t)) break;
-    setTile(tx,y,AIR);
-    state.falling.push({ x:tx*TILE, y:y*TILE, vy:1, tile:t });
+  if(!FALLABLE.has(tileAt(tx,ty-1))) return;
+  const stack = [[tx, ty-1]], seen = new Set();
+  let cap = 0;
+  while(stack.length && cap < 1200){
+    const [x,y] = stack.pop();
+    if(x<0 || x>=WORLD_W || y<=0) continue;
+    const k = x+','+y;
+    if(seen.has(k)) continue;
+    const t = tileAt(x,y);
+    if(!FALLABLE.has(t)) continue;
+    seen.add(k); cap++;
+    setTile(x,y,AIR);
+    if(t===TREEWOOD || t===JUNGLEWOOD) state.falling.push({ x:x*TILE, y:y*TILE, vy:1, tile:t });
+    else spawnParticles(x*TILE+8, y*TILE+8, tileDef(t).color, 3); // leaves burst
+    // climb up and sideways (and down-diagonals for drooping leaf clumps), but
+    // never straight down — that would eat the stump left below the cut.
+    stack.push([x,y-1],[x-1,y],[x+1,y],[x-1,y-1],[x+1,y-1],[x-1,y+1],[x+1,y+1]);
+  }
+}
+// Night-time meteor shower: streaks fall from the sky near the player. Most burn
+// up harmlessly; a rare "strike" reaches the ground and gouges a fresh meteor
+// crater (1–3 meteorite blocks) — a dynamic way to find meteorite. See render's
+// drawMeteors + shooting-star sky flecks for the visuals.
+export function updateMeteors(dt){
+  if(!world || !state.player) return;
+  const f = (state.time % 180000)/180000;             // dayFrac; night ≈ 0.5–1
+  const night = f>0.52 && f<0.99;
+  if(night && state.meteors.length<4 && chance(0.006*dt)){
+    const p = state.player;
+    const tx = clamp((p.x/TILE|0) + ri(-42,42), 6, WORLD_W-6);
+    const strike = chance(0.4);
+    state.meteors.push({ x:tx*TILE - 240, y:-70, vx:5.4, vy:6.4, strike, life:2000 });
+  }
+  for(let i=state.meteors.length-1;i>=0;i--){
+    const m = state.meteors[i];
+    m.x += m.vx*dt; m.y += m.vy*dt; m.life -= dt;
+    const col = clamp(m.x/TILE|0, 0, WORLD_W-1);
+    const groundY = world.surface[col]*TILE;
+    if(m.strike && m.y >= groundY){
+      strikeMeteor(col);
+      spawnParticles(m.x, groundY, '#ff8a4a', 22);
+      state.flashes.push({ color:'rgba(255,150,90,1)', life:220 });
+      msg('A meteor struck the surface!');
+      state.meteors.splice(i,1); continue;
+    }
+    // cosmetic streaks burn up above the ground; anything expired/off-map is culled
+    if(m.life<=0 || m.x<0 || m.x>WORLD_W*TILE || (!m.strike && m.y>groundY-90) || m.y>groundY+8){
+      state.meteors.splice(i,1);
+    }
   }
 }
 export function updateFalling(dt){
