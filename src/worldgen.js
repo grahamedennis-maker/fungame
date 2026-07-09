@@ -61,38 +61,22 @@ export function generateWorld(W,H){
   // ---- FLORA (biome-aware) ----
   function placeTree(x, wood, leaf){
     const sy = surface[x];
-    const style = ri(0,3);                       // 0 round, 1 tall, 2 broad, 3 bushy
-    const th = ri(7,14) + (style===1?3:0);       // tall style has an extra-long trunk
-    for(let i=1;i<=th;i++){ if(sy-i>0) grid[sy-i][x]=wood; } // natural trunk (collapses when chopped)
-    // little angled roots at the base
-    if(x-1>0 && grid[sy-1][x-1]===AIR) grid[sy-1][x-1]=wood;
-    if(x+1<W && grid[sy-1][x+1]===AIR) grid[sy-1][x+1]=wood;
-    // side branches with a small leaf "paw" at each tip (bushy style has more)
-    const nB = style===3 ? ri(3,5) : ri(1,3);
-    for(let k=0; k<nB; k++){
-      const by = sy - ri(3, th-2), dir = chance(0.5)?-1:1, blen = ri(1,2);
-      for(let j=1;j<=blen;j++){ const bx=x+dir*j; if(bx>0&&bx<W&&by>0 && grid[by][bx]===AIR) grid[by][bx]=wood; }
-      const tipx = x+dir*(blen+1);
-      for(let ly=-1;ly<=1;ly++) for(let lx=-1;lx<=1;lx++){
-        const xx=tipx+lx, yy=by+ly;
-        if(xx>0&&xx<W&&yy>0&&yy<H && grid[yy][xx]===AIR && Math.abs(lx)+Math.abs(ly)<=2) grid[yy][xx]=leaf;
-      }
-    }
-    // crown shape varies by style so no two tree types look alike
+    const style = ri(0,2);                        // 0 round, 1 tall, 2 broad
+    const th = ri(8,13) + (style===1?4:0);        // clean trunk; tall style is much taller
+    for(let i=1;i<=th;i++){ if(sy-i>0) grid[sy-i][x]=wood; } // trunk runs straight into the ground
+    // big leafy crown seated ON TOP of the trunk, shape varying by style
     let cRx, cRy;
-    if(style===1){ cRx=ri(3,4); cRy=ri(6,8); }        // tall oval crown
-    else if(style===2){ cRx=ri(6,8); cRy=ri(3,5); }   // broad, spreading crown
-    else { cRx=ri(4,6); cRy=cRx+ri(0,1); }            // round / bushy
-    const topY = sy-th;
-    for(let ly=-cRy-2; ly<=cRy; ly++) for(let lx=-cRx-1; lx<=cRx+1; lx++){
-      const nx=lx/(cRx+0.6), ny=(ly+1.3)/(cRy+0.6);
-      if(nx*nx + ny*ny <= 1.05){
-        const yy=topY+ly, xx=x+lx;
+    if(style===1){ cRx=ri(3,4); cRy=ri(5,7); }    // tall oval crown
+    else if(style===2){ cRx=ri(6,8); cRy=ri(4,5); } // broad spreading crown
+    else { cRx=ri(5,6); cRy=cRx; }                // round crown
+    const topY = sy-th, cy0 = topY - cRy + 2;     // crown centred above the trunk top (small overlap)
+    for(let ly=-cRy-1; ly<=cRy; ly++) for(let lx=-cRx-1; lx<=cRx+1; lx++){
+      const nx=lx/(cRx+0.7), ny=ly/(cRy+0.7);
+      if(nx*nx + ny*ny <= 1.0){
+        const yy=cy0+ly, xx=x+lx;
         if(xx>=0&&xx<W&&yy>0&&yy<H && grid[yy][xx]===AIR) grid[yy][xx]=leaf;
       }
     }
-    // fill the neck where trunk meets crown
-    for(let lx=-1;lx<=1;lx++){ const xx=x+lx, yy=topY+1; if(xx>0&&xx<W&&yy<H&&grid[yy][xx]===AIR) grid[yy][xx]=leaf; }
   }
   function placeCactus(x){
     const sy = surface[x], h = ri(2,4);

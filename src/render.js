@@ -244,15 +244,16 @@ function drawBark(def, tx, ty, sx, sy){
     ctx.fillStyle=shade(col,-20); ctx.fillRect(sx, y0+hh-1, TILE+1, 1);
     return;
   }
-  // vertical trunk: a rounded column ~12px wide, 2px of background at each side
-  const x0=sx+2, w=TILE-4, topCap=!wU?2:0, botCap=!wD?2:0;
-  ctx.fillStyle=shade(col,-34); ctx.fillRect(x0-1, sy, w+2, TILE+1);           // dark rounded edge
-  ctx.fillStyle=col;            ctx.fillRect(x0, sy+topCap, w, TILE+1-topCap-botCap);
-  ctx.fillStyle=shade(col,22);  ctx.fillRect(x0+2, sy, 2, TILE+1);              // lit side (cylinder)
-  ctx.fillStyle=shade(col,-22); ctx.fillRect(x0+w-3, sy, 2, TILE+1);           // shaded side
-  ctx.fillStyle=shade(col,-14); ctx.fillRect(x0+5, sy, 1, TILE+1);             // bark grain
+  // vertical trunk: a chunky cylindrical bark column, full-height so it meets the
+  // ground with no gap (only ~1px of background at each side)
+  const x0=sx+1, w=TILE-2;
+  ctx.fillStyle=shade(col,-36); ctx.fillRect(x0-1, sy, w+2, TILE+1);           // dark bark edge
+  ctx.fillStyle=col;            ctx.fillRect(x0, sy, w, TILE+1);
+  ctx.fillStyle=shade(col,24);  ctx.fillRect(x0+2, sy, 2, TILE+1);             // lit side (cylinder)
+  ctx.fillStyle=shade(col,-24); ctx.fillRect(x0+w-3, sy, 2, TILE+1);          // shaded side
+  ctx.fillStyle=shade(col,-14); ctx.fillRect(x0+5, sy, 1, TILE+1); ctx.fillRect(x0+w-6, sy, 1, TILE+1); // bark grain
   const h=hash2(tx,ty);
-  if(h>0.82){ ctx.fillStyle=shade(col,-30); ctx.fillRect(x0+4, sy+6, 3,3); ctx.fillStyle=shade(col,12); ctx.fillRect(x0+5, sy+7, 1,1); } // knot
+  if(h>0.8){ ctx.fillStyle=shade(col,-30); ctx.fillRect(x0+4, sy+6, 3,3); ctx.fillStyle=shade(col,14); ctx.fillRect(x0+5, sy+7, 1,1); } // knot
 }
 function isLeaf(tx,ty){ const row=world.grid[ty]; const tt=row?row[tx]:0; return tt===LEAF||tt===JUNGLELEAF; }
 // Leaves as lumpy, ragged foliage clusters (Terraria-style): an irregular body
