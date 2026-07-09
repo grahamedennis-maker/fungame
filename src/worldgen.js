@@ -77,6 +77,12 @@ export function generateWorld(W,H){
         if(xx>=0&&xx<W&&yy>0&&yy<H && grid[yy][xx]===AIR) grid[yy][xx]=leaf;
       }
     }
+    // small drooping leaf sprigs dangling just under the crown edges
+    for(const dir of [-1,1]){
+      if(!chance(0.7)) continue;
+      const bx = x + dir*(cRx-1);
+      for(let d=0, n=ri(1,2); d<=n; d++){ const yy=topY+2+d; if(bx>0&&bx<W&&yy<H&&grid[yy][bx]===AIR) grid[yy][bx]=leaf; }
+    }
   }
   function placeCactus(x){
     const sy = surface[x], h = ri(2,4);
