@@ -187,8 +187,9 @@ function drawHeldTool(p, psx, psy){
   // there. Facing left just MIRRORS the whole swing horizontally, so it sweeps the
   // correct way and the icon faces left — fixing the left-facing bug.
   const startAng = Math.PI*1.25;                            // 225° (right-facing)
-  // The tip rests pointing at 225°; a swing sweeps over the top from 225° to 0°.
-  const bladeAng = active ? (startAng + (2*Math.PI - startAng)*e) : startAng;
+  const endAng = 2*Math.PI + Math.PI*0.25;                  // 45° (reached over the top)
+  // The tip rests pointing at 225°; a swing sweeps over the top from 225° to 45°.
+  const bladeAng = active ? (startAng + (endAng - startAng)*e) : startAng;
   const isMelee = tool==='sword' || tool==='hammer' || tool==='flail';
 
   ctx.save();
