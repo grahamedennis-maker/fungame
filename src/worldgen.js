@@ -61,13 +61,15 @@ export function generateWorld(W,H){
   // ---- FLORA (biome-aware) ----
   function placeTree(x, wood, leaf){
     const sy = surface[x];
-    const th = ri(7,13); // tall Terraria-style trunk
+    const style = ri(0,3);                       // 0 round, 1 tall, 2 broad, 3 bushy
+    const th = ri(7,14) + (style===1?3:0);       // tall style has an extra-long trunk
     for(let i=1;i<=th;i++){ if(sy-i>0) grid[sy-i][x]=wood; } // natural trunk (collapses when chopped)
     // little angled roots at the base
     if(x-1>0 && grid[sy-1][x-1]===AIR) grid[sy-1][x-1]=wood;
     if(x+1<W && grid[sy-1][x+1]===AIR) grid[sy-1][x+1]=wood;
-    // side branches with a small leaf "paw" at each tip, at a few mid-heights
-    for(let k=0, nB=ri(2,3); k<nB; k++){
+    // side branches with a small leaf "paw" at each tip (bushy style has more)
+    const nB = style===3 ? ri(3,5) : ri(1,3);
+    for(let k=0; k<nB; k++){
       const by = sy - ri(3, th-2), dir = chance(0.5)?-1:1, blen = ri(1,2);
       for(let j=1;j<=blen;j++){ const bx=x+dir*j; if(bx>0&&bx<W&&by>0 && grid[by][bx]===AIR) grid[by][bx]=wood; }
       const tipx = x+dir*(blen+1);
@@ -76,16 +78,20 @@ export function generateWorld(W,H){
         if(xx>0&&xx<W&&yy>0&&yy<H && grid[yy][xx]===AIR && Math.abs(lx)+Math.abs(ly)<=2) grid[yy][xx]=leaf;
       }
     }
-    // big rounded leafy crown sitting on top of the trunk (Terraria-style)
-    const topY = sy-th, canopyR = ri(4,6);
-    for(let ly=-canopyR-2; ly<=canopyR-1; ly++) for(let lx=-canopyR; lx<=canopyR; lx++){
-      // slightly taller-than-wide, biased upward so the crown rises above the trunk top
-      if(Math.hypot(lx*1.05, (ly+1.2)*0.95) <= canopyR+0.5){
+    // crown shape varies by style so no two tree types look alike
+    let cRx, cRy;
+    if(style===1){ cRx=ri(3,4); cRy=ri(6,8); }        // tall oval crown
+    else if(style===2){ cRx=ri(6,8); cRy=ri(3,5); }   // broad, spreading crown
+    else { cRx=ri(4,6); cRy=cRx+ri(0,1); }            // round / bushy
+    const topY = sy-th;
+    for(let ly=-cRy-2; ly<=cRy; ly++) for(let lx=-cRx-1; lx<=cRx+1; lx++){
+      const nx=lx/(cRx+0.6), ny=(ly+1.3)/(cRy+0.6);
+      if(nx*nx + ny*ny <= 1.05){
         const yy=topY+ly, xx=x+lx;
         if(xx>=0&&xx<W&&yy>0&&yy<H && grid[yy][xx]===AIR) grid[yy][xx]=leaf;
       }
     }
-    // a couple of extra leaf tiles filling the neck where trunk meets crown
+    // fill the neck where trunk meets crown
     for(let lx=-1;lx<=1;lx++){ const xx=x+lx, yy=topY+1; if(xx>0&&xx<W&&yy<H&&grid[yy][xx]===AIR) grid[yy][xx]=leaf; }
   }
   function placeCactus(x){
@@ -98,11 +104,13 @@ export function generateWorld(W,H){
     if(b==='desert'){
       if(x-lastTreeX>5 && chance(0.06)){ lastTreeX=x; placeCactus(x); }
     } else if(b==='snow'){
-      if(x-lastTreeX>6 && chance(0.16)){ lastTreeX=x; placeTree(x, TREEWOOD, SNOW); }
+      if(x-lastTreeX>5 && chance(0.22)){ lastTreeX=x; placeTree(x, TREEWOOD, SNOW); }
     } else {
-      const dens = b==='jungle' ? 0.40 : 0.20; // jungle is densely wooded
-      if(x-lastTreeX>6 && chance(dens)){ lastTreeX=x;
-        if(b==='jungle') placeTree(x, JUNGLEWOOD, JUNGLELEAF); else placeTree(x, TREEWOOD, LEAF); }
+      const jungle = b==='jungle';
+      const dens = jungle ? 0.44 : 0.36;   // denser woodland — crowns merge into a canopy
+      const gap  = jungle ? 5 : 4;
+      if(x-lastTreeX>gap && chance(dens)){ lastTreeX=x;
+        if(jungle) placeTree(x, JUNGLEWOOD, JUNGLELEAF); else placeTree(x, TREEWOOD, LEAF); }
       // hanging jungle vines
       if(b==='jungle' && chance(0.10)){
         const sy=surface[x], vl=ri(2,5);
