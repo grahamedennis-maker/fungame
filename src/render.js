@@ -150,7 +150,7 @@ function drawHeldTool(p, psx, psy){
   if(!held) return;
   const def = ITEMS[held.id];
   const tool = def && def.tool;
-  const swingDur = tool==='sword' ? 1500 : SWING_DUR;   // swords swing over 1.5s
+  const swingDur = tool==='sword' ? 500 : SWING_DUR;    // swords swing over 0.5s
   const t = (performance.now() - state.swingStart) / swingDur;
   const active = t>=0 && t<1;
   const isSword = tool==='sword';
@@ -542,45 +542,365 @@ function roundBlob(x,y,w,h,r){
 // big glowing eye whose pupil tracks the player, and a jagged fanged maw.
 // The Fallen Knight — a tall armoured figure with a greatsword. His back crack
 // glows while he strains to pull his sword out of the ground (his vulnerable window).
-function drawKnightSword(b, x, y, W, H, f, bd){
+function drawKnightSword(b, x, y, W, H, f, bd, dark){
   const groundY = b.groundY - state.camY;
-  if(b.mode==='slam'||b.mode==='pull'||b.mode==='roar'){        // planted in the ground out front
-    const px = x + (f>0? W+8 : -10);
-    ctx.fillStyle=shade(bd.color,12); ctx.fillRect(px-2, y+H*0.18, 5, Math.max(4, groundY-(y+H*0.18)+10));
-    ctx.fillStyle=bd.trim;           ctx.fillRect(px-6, y+H*0.18, 13, 4);       // crossguard
-    ctx.fillStyle='#6a4326';         ctx.fillRect(px-1, y+H*0.06, 3, H*0.13);   // grip
-  } else if(b.mode==='spikedrag'){                               // dragged behind at ~45°
-    const bx=x+(f>0?-6:W+6), by=y+H*0.38;
-    ctx.strokeStyle=shade(bd.color,12); ctx.lineWidth=5; ctx.lineCap='round';
-    ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(bx - f*42, groundY); ctx.stroke(); ctx.lineWidth=1; ctx.lineCap='butt';
-  } else {                                                       // held forward
-    const hx=x+(f>0?W-4:4), hy=y+H*0.42, up=(b.mode==='stab'?0:22);
-    ctx.strokeStyle=shade(bd.color,12); ctx.lineWidth=5; ctx.lineCap='round';
-    ctx.beginPath(); ctx.moveTo(hx,hy); ctx.lineTo(hx + f*46, hy-up); ctx.stroke(); ctx.lineWidth=1; ctx.lineCap='butt';
+  if(b.mode==='slam'||b.mode==='pull'||b.mode==='roar'){        // weapon embedded in the ground out front
+    const px = x + (f>0? W+10 : -12), topY = y+H*0.16-AXE_EXT;
+    if(dark){                                                    // GREAT SWORD stabbed into the ground
+      ctx.fillStyle=shade(bd.color,34); ctx.fillRect(px-4, topY, 8, Math.max(4, groundY-topY+10));  // blade
+      ctx.fillStyle=shade(bd.color,62); ctx.fillRect(px-1, topY, 2, Math.max(4, groundY-topY));      // fuller
+      ctx.fillStyle=bd.trim; ctx.fillRect(px-14, topY-2, 28, 5);            // crossguard near the top
+      ctx.fillStyle='#2a1a10'; ctx.fillRect(px-3, topY-16, 6, 14);          // grip above
+      ctx.fillStyle=bd.trim; ctx.fillRect(px-4, topY-22, 8, 6);             // pommel
+      return;
+    }
+    ctx.fillStyle='#4a3420'; ctx.fillRect(px-2, topY, 5, Math.max(4, groundY-topY+8));     // haft into ground
+    ctx.fillStyle='#372615'; ctx.fillRect(px-2, topY, 1.5, Math.max(4, groundY-topY+8));
+    const hy=topY+8;                                                                        // axe head near the top
+    ctx.fillStyle=shade(bd.color,-30);
+    ctx.beginPath(); ctx.moveTo(px+2,hy-9); ctx.lineTo(px+16,hy-2); ctx.lineTo(px+16,hy+11); ctx.lineTo(px+2,hy+15); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(px-2,hy-9); ctx.lineTo(px-16,hy-2); ctx.lineTo(px-16,hy+11); ctx.lineTo(px-2,hy+15); ctx.closePath(); ctx.fill();
+    ctx.fillStyle=shade(bd.color,14); ctx.fillRect(px-3, hy-9, 6, 24);
+    ctx.fillStyle=shade(bd.color,50); ctx.fillRect(px+14,hy-1,2,10); ctx.fillRect(px-16,hy-1,2,10);
+  } else if(b.mode==='spikedrag'){                               // axe dragged along the ground behind
+    const bx=x+(f>0?-8:W+8), by=y+H*0.36;
+    ctx.strokeStyle='#4a3420'; ctx.lineWidth=5; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(bx - f*68, groundY); ctx.stroke(); ctx.lineWidth=1; ctx.lineCap='butt';
+    ctx.fillStyle=shade(bd.color,-10); ctx.fillRect(bx-f*68-7, groundY-10, 14, 12);        // axe head scraping the ground
+    ctx.fillStyle=shade(bd.color,30); ctx.fillRect(bx-f*68-7, groundY-2, 14, 3);
   }
+}
+// Arm + greatsword swung around the shoulder, aligned to a world angle (like the
+// player's broadsword swing). Blade points 'up' in the local frame at rotation 0.
+// A big double-bit battle-axe, drawn 'up' in the local frame and rotated to the
+// swing angle. Long hafts + a broad twin-bladed head near the top.
+// Viking double-bit axe head (broad crescent blades both sides), centred at local origin.
+function drawVikingAxeHead(bd){
+  const bit=(dir)=>{
+    ctx.fillStyle=shade(bd.color,-34); ctx.beginPath();
+    ctx.moveTo(dir*2,-10); ctx.quadraticCurveTo(dir*22,-13, dir*22,5); ctx.quadraticCurveTo(dir*15,16, dir*2,13); ctx.closePath(); ctx.fill();
+    ctx.fillStyle=shade(bd.color,12); ctx.beginPath();
+    ctx.moveTo(dir*2,-7); ctx.quadraticCurveTo(dir*16,-9, dir*17,5); ctx.quadraticCurveTo(dir*11,12, dir*2,10); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle=shade(bd.color,52); ctx.lineWidth=2; ctx.beginPath();
+    ctx.moveTo(dir*19,-8); ctx.quadraticCurveTo(dir*23,5, dir*17,15); ctx.stroke(); ctx.lineWidth=1;
+  };
+  bit(1); bit(-1);
+  ctx.fillStyle=shade(bd.color,20); ctx.fillRect(-3,-10,6,24);          // socket
+  ctx.fillStyle=shade(bd.color,-24); ctx.fillRect(-3,-10,2,24);
+}
+const AXE_EXT = 42;                                        // haft lengthened for longer reach (~2.5 blocks)
+function drawKnightAxeShape(bd, H){                        // full axe (haft + head), 'up' in local frame
+  const shaftTop=-H*0.5-AXE_EXT, shaftBot=H*0.2, hy=-H*0.32-AXE_EXT;
+  ctx.fillStyle='#4a3420'; ctx.fillRect(-2.5, shaftTop, 5, shaftBot-shaftTop);
+  ctx.fillStyle='#372615'; ctx.fillRect(-2.5, shaftTop, 1.5, shaftBot-shaftTop);
+  ctx.fillStyle=bd.trim;   ctx.fillRect(-3, hy+16, 6, 3);
+  ctx.save(); ctx.translate(0, hy); drawVikingAxeHead(bd); ctx.restore();
+  ctx.fillStyle=bd.trim; ctx.fillRect(-2, shaftBot-4, 4, 5);            // butt cap
+}
+// A great SWORD (the Dark Knight's weapon), drawn 'up' in the local frame: an
+// ornate Dark-Souls-style blade — glowing rune fuller, winged guard, gem pommel.
+function drawKnightBladeShape(bd, H){
+  const tip=-H*0.60-AXE_EXT, guardY=H*0.02;
+  const steel=shade(bd.color,42), lite=shade(bd.color,74), dk=shade(bd.color,-12);
+  ctx.fillStyle=steel; ctx.beginPath();                                // blade body
+  ctx.moveTo(0,tip); ctx.lineTo(7,tip+18); ctx.lineTo(7,guardY); ctx.lineTo(-7,guardY); ctx.lineTo(-7,tip+18); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=dk;   ctx.fillRect(2,tip+18,5,guardY-tip-18);          // shaded half
+  ctx.fillStyle=lite; ctx.fillRect(-6,tip+16,3,guardY-tip-18);         // lit edge
+  ctx.fillStyle=bd.eye; ctx.fillRect(-1,tip+20,2,guardY-tip-32);       // glowing cursed fuller
+  ctx.fillStyle=shade(bd.eye,40);                                      // runes etched along it
+  for(let ry=tip+36; ry<guardY-20; ry+=22) ctx.fillRect(-2,ry,4,3);
+  ctx.fillStyle=bd.trim; ctx.beginPath();                              // winged crossguard
+  ctx.moveTo(-18,guardY+3); ctx.quadraticCurveTo(-7,guardY-4,0,guardY); ctx.quadraticCurveTo(7,guardY-4,18,guardY+3);
+  ctx.lineTo(13,guardY+7); ctx.quadraticCurveTo(6,guardY+3,0,guardY+7); ctx.quadraticCurveTo(-6,guardY+3,-13,guardY+7); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=shade(bd.trim,26); ctx.fillRect(-16,guardY+1,32,2);
+  const gripLen=H*0.15;
+  ctx.fillStyle='#1c1424'; ctx.fillRect(-3, guardY+7, 6, gripLen);     // wrapped grip
+  ctx.fillStyle=shade(bd.trim,-18); for(let gy=guardY+9; gy<guardY+7+gripLen; gy+=4) ctx.fillRect(-3,gy,6,1);
+  ctx.fillStyle=bd.trim; ctx.beginPath(); ctx.arc(0,guardY+9+gripLen,5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=bd.eye;  ctx.beginPath(); ctx.arc(0,guardY+9+gripLen,2.5,0,Math.PI*2); ctx.fill();  // glowing gem pommel
+}
+function drawKnightWeaponShape(bd, H, dark){ dark ? drawKnightBladeShape(bd,H) : drawKnightAxeShape(bd,H); }
+// Two-handed carry pose: axe held diagonally in front, both gauntlets on the haft,
+// The haft rests on the facing-side shoulder, leaning back so the twin blades sit
+// up and behind — both gauntlets grip the lower haft and the face stays visible.
+function drawKnightHold(x, y, W, H, f, bd, dark){
+  const cx=x+W/2;
+  ctx.save();
+  ctx.translate(cx + f*W*0.30, y+H*0.24);                  // pivot on the shoulder
+  ctx.rotate(-f*0.40);                                     // lean the weapon BACK over the shoulder
+  if(dark){                                                // great sword resting up over the shoulder
+    ctx.save(); ctx.translate(0, H*0.06); drawKnightBladeShape(bd, H); ctx.restore();
+    ctx.fillStyle=bd.trim;   ctx.fillRect(-4, H*0.09, 8, 7); ctx.fillRect(-4, H*0.20, 8, 7); // two hands on grip
+    ctx.fillStyle=shade(bd.trim,-22); ctx.fillRect(-4, H*0.09+5, 8, 2); ctx.fillRect(-4, H*0.20+5, 8, 2);
+    ctx.restore(); return;
+  }
+  const topY=-H*0.34-AXE_EXT, botY=H*0.30;                 // head up top -> hands down low
+  ctx.fillStyle='#4a3420'; ctx.fillRect(-2.5, topY, 5, botY-topY);      // haft
+  ctx.fillStyle='#372615'; ctx.fillRect(-2.5, topY, 1.5, botY-topY);
+  ctx.fillStyle=bd.trim;   ctx.fillRect(-3, botY-3, 6, 3);             // butt cap
+  ctx.fillStyle=bd.trim;   ctx.fillRect(-4, H*0.07, 8, 7); ctx.fillRect(-4, H*0.18, 8, 7); // two hands, lower haft
+  ctx.fillStyle=shade(bd.trim,-22); ctx.fillRect(-4, H*0.07+5, 8, 2); ctx.fillRect(-4, H*0.18+5, 8, 2);
+  ctx.save(); ctx.translate(0, topY+11); drawVikingAxeHead(bd); ctx.restore();  // blades up & behind
+  ctx.restore();
+}
+function drawKnightWeapon(x, y, W, H, f, bd, bladeAng, dark){
+  const shx = x + (f>0 ? W-4 : 4), shy = y + H*0.30;
+  ctx.save();
+  ctx.translate(shx, shy);
+  if(f<0) ctx.scale(-1,1);
+  ctx.rotate(bladeAng + Math.PI/2);
+  ctx.fillStyle=shade(bd.color,-6);  ctx.fillRect(-5, 0, 10, H*0.2);            // arm to the grip
+  ctx.fillStyle=shade(bd.color,-26); ctx.fillRect(-5, 0, 3, H*0.2);
+  ctx.fillStyle=bd.trim;             ctx.fillRect(-6, H*0.18, 12, 5);           // gauntlet
+  drawKnightWeaponShape(bd, H, dark);
+  ctx.restore();
+}
+// Bright crescent slash following the knight's greatsword through its swing.
+function drawKnightSlash(x, y, W, H, f, a0, a1){
+  const shx = x + (f>0 ? W-4 : 4), shy = y + H*0.30;
+  ctx.save(); ctx.translate(shx, shy); if(f<0) ctx.scale(-1,1); ctx.lineCap='round';
+  const R=H*0.6, steps=9;
+  for(let i=0;i<steps;i++){ const g0=i/steps, g1=(i+1)/steps;
+    ctx.globalAlpha=0.5*g1*g1; ctx.strokeStyle='#eef2f8'; ctx.lineWidth=2+7*g1;
+    ctx.beginPath(); ctx.arc(0,0,R, a0+(a1-a0)*g0, a0+(a1-a0)*g1); ctx.stroke(); }
+  ctx.globalAlpha=1; ctx.lineWidth=1; ctx.lineCap='butt'; ctx.restore();
+}
+// A conjured blade for the Dark Knight's sword-rain, pointing straight DOWN. The
+// WHOLE sword (pommel..tip) fits within `len` so it reads as exactly that long.
+function drawSkyBlade(sx, topY, len, ghost){
+  const col = ghost ? '#9a5fd0' : '#2b2536', edge = ghost ? '#e6ccff' : '#a656d8';
+  const gripLen = Math.max(3, len*0.16), guardY = topY+3+gripLen, tip = topY+len;
+  ctx.fillStyle=edge; ctx.fillRect(sx-3, topY, 6, 3);                             // pommel (top)
+  ctx.fillStyle=ghost?'#6a2fa0':'#241528'; ctx.fillRect(sx-2, topY+3, 4, gripLen); // grip
+  ctx.fillStyle=edge; ctx.fillRect(sx-8, guardY, 16, 3);                          // crossguard
+  ctx.fillStyle=shade(edge,-22); ctx.fillRect(sx-8, guardY+2, 16, 1);
+  const bTop=guardY+3;
+  ctx.fillStyle=col; ctx.beginPath();                                            // blade -> tip down
+  ctx.moveTo(sx-4, bTop); ctx.lineTo(sx+4, bTop); ctx.lineTo(sx+4, tip-6); ctx.lineTo(sx, tip); ctx.lineTo(sx-4, tip-6); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=edge; ctx.fillRect(sx-1, bTop, 2, tip-bTop-6);                    // glowing fuller
+}
+// The Dark Knight's void javelin — a detailed spear (shaft, bound socket, leaf
+// head, feathered tail) centred at (px,py), rotated to `ang`. ~2 blocks long.
+function drawJavelin(px, py, ang, L, glow){
+  ctx.save(); ctx.translate(px, py); ctx.rotate(ang);
+  const h=L/2;
+  if(glow) drawGlow(ctx,'rgba(150,60,230,0.6)', L*0.8, 0, 0, 1);
+  ctx.fillStyle='#1c1220'; ctx.fillRect(-h, -2, L*0.82, 4);                       // shaft
+  ctx.fillStyle='#33203c'; ctx.fillRect(-h, -2, L*0.82, 1);                       // shaft highlight
+  ctx.fillStyle='#8a44c8'; ctx.fillRect(-h+L*0.28, -3, 2, 6); ctx.fillRect(-h+L*0.46, -3, 2, 6); // binding cords
+  ctx.fillStyle='#7a2ab0'; ctx.fillRect(h*0.5, -4, 5, 8);                         // socket
+  ctx.fillStyle='#c060ff'; ctx.beginPath();                                       // leaf spearhead (+x)
+  ctx.moveTo(h*0.62,-7); ctx.lineTo(h+9,0); ctx.lineTo(h*0.62,7); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#eaccff'; ctx.beginPath();
+  ctx.moveTo(h*0.72,-3.5); ctx.lineTo(h+6,0); ctx.lineTo(h*0.72,3.5); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#5a1a9a';                                                        // feathered tail (-x)
+  ctx.beginPath(); ctx.moveTo(-h,-2); ctx.lineTo(-h-9,-8); ctx.lineTo(-h-2,-2); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-h,2); ctx.lineTo(-h-9,8); ctx.lineTo(-h-2,2); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+// Armoured arms: a near upper-arm + forearm from the front shoulder toward the
+// grip so he visibly has arms (the far arm is drawn behind the torso separately).
+function drawKnightArms(x, y, W, H, f, metal, dark, trim, mode){
+  const swing = (mode==='stab'||mode==='slam'||mode==='spikedrag'); // the swinging arm is drawn with the weapon
+  const sx = f>0 ? x+W-9 : x+1;                                       // front shoulder
+  const elbowY = y+H*0.30, wristY = y+H*0.46;
+  // near arm (visible over the torso); when swinging, the weapon draws its own arm
+  if(!swing){
+    ctx.fillStyle=metal; ctx.fillRect(sx, y+H*0.24, 9, H*0.16);       // upper arm
+    ctx.fillStyle=shade(metal,-22); ctx.fillRect(sx+(f>0?6:0), y+H*0.24, 3, H*0.16);
+    ctx.fillStyle=metal; ctx.fillRect(sx+(f>0?-1:1), elbowY, 9, wristY-elbowY); // forearm
+    ctx.fillStyle=trim;  ctx.fillRect(sx+(f>0?-1:1), elbowY-2, 9, 3);    // elbow band
+  }
+}
+// A giant clawed hand of shadow that erupts from the ground and hauls the knight
+// aloft during the phase-2 transformation.
+function drawDarkHand(b, x, y, W, H){
+  const groundY = b.groundY - state.camY;
+  const cx = x+W/2, top = y+H*0.55;
+  const t = clamp(1-(b.riseTimer||0)/2400, 0, 1);
+  drawGlow(ctx, 'rgba(120,40,200,0.55)', 76, cx, top, 2);
+  ctx.fillStyle='#2a1440';                                            // wrist/forearm rising from the floor
+  ctx.fillRect(cx-18, top, 36, Math.max(0, groundY-top));
+  ctx.fillStyle='#3a1c58'; ctx.fillRect(cx-18, top, 4, Math.max(0, groundY-top));   // rim light
+  ctx.fillStyle='#3a1c58'; ctx.fillRect(cx-20, top-2, 40, 16);        // palm cupping his waist
+  // five clawed fingers curling up around him
+  ctx.lineCap='round';
+  for(let i=0;i<5;i++){
+    const fx = cx-22 + i*11, curl = (0.4+t*0.6);
+    const tipx=fx+(i-2)*6, tipy=top-H*0.30*curl;
+    ctx.strokeStyle='#4a2472'; ctx.lineWidth=7;
+    ctx.beginPath(); ctx.moveTo(fx, top+8); ctx.quadraticCurveTo(fx+(i-2)*3, top-H*0.16*curl, tipx, tipy); ctx.stroke();
+    ctx.strokeStyle='#7a3ab0'; ctx.lineWidth=2;                       // lit edge + claw tip
+    ctx.beginPath(); ctx.moveTo(fx-2, top+8); ctx.quadraticCurveTo(fx-2+(i-2)*3, top-H*0.16*curl, tipx-2, tipy); ctx.stroke();
+    ctx.fillStyle='#c9a0ff'; ctx.fillRect(tipx-1, tipy-2, 3, 4);      // pale claw tip
+  }
+  ctx.lineWidth=1; ctx.lineCap='butt';
+  // wispy dark energy swirling upward
+  ctx.fillStyle='rgba(180,110,255,0.7)';
+  for(let i=0;i<8;i++){ const a=(b.t*0.03+i)*1.7, r=22+((b.t*0.4+i*9)%46);
+    ctx.fillRect((cx+Math.cos(a)*r)|0, (top-10+Math.sin(a)*r*0.6)|0, 2,2); }
+}
+// A ragged Dark-Souls cloak hanging behind the Dark Knight, drawn before the body.
+function drawDarkCape(x, y, W, H, f, t){
+  const sway = Math.sin(t*0.05)*4, top=y+H*0.18, by=y+H*0.90;
+  ctx.fillStyle='#160b22';
+  ctx.beginPath();
+  ctx.moveTo(x+5, top); ctx.lineTo(x+W-5, top);
+  ctx.lineTo(x+W-3+sway, y+H*0.72);
+  ctx.lineTo(x+W-9+sway, by);                          // tattered hem
+  ctx.lineTo(x+W-16+sway, y+H*0.74);
+  ctx.lineTo(x+W*0.60+sway*0.6, by+7);
+  ctx.lineTo(x+W*0.5+sway*0.4, y+H*0.72);
+  ctx.lineTo(x+W*0.40+sway*0.4, by+7);
+  ctx.lineTo(x+16-sway, y+H*0.74);
+  ctx.lineTo(x+9-sway, by);
+  ctx.lineTo(x+3-sway, y+H*0.72);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#2a1240';                             // inner folds
+  ctx.fillRect(x+W*0.5-2, top+4, 4, H*0.5);
+  ctx.strokeStyle='rgba(130,60,190,0.45)'; ctx.lineWidth=2; ctx.stroke(); ctx.lineWidth=1;
 }
 function drawKnight(b, bd){
   const shk=b.shake||0;
   const x=Math.round(b.x-state.camX+shk), y=Math.round(b.y-state.camY), W=b.w, H=b.h, f=b.facing;
-  const metal=bd.color, dark=bd.dark, trim=bd.trim;
-  ctx.fillStyle=dark; ctx.fillRect(x+6, y+H*0.66|0, 10, H*0.34|0); ctx.fillRect(x+W-16, y+H*0.66|0, 10, H*0.34|0); // legs
-  ctx.fillStyle=metal;         ctx.fillRect(x+2, y+H*0.28|0, W-4, H*0.4|0);          // torso
-  ctx.fillStyle=shade(metal,18); ctx.fillRect(x+2, y+H*0.28|0, W-4, 3);
-  ctx.fillStyle=dark;          ctx.fillRect(x+2, (y+H*0.66-3)|0, W-4, 3);
-  ctx.fillStyle=trim;          ctx.fillRect(x-2, y+H*0.28|0, 8, 9); ctx.fillRect(x+W-6, y+H*0.28|0, 8, 9); // pauldrons
-  ctx.fillStyle=shade(metal,-26); ctx.fillRect((x+W/2-1)|0, y+H*0.3|0, 2, H*0.34|0); // chest seam
-  ctx.fillStyle=metal;         ctx.fillRect((x+W/2-9)|0, y+H*0.08|0, 18, H*0.22|0);  // helmet
-  ctx.fillStyle=dark;          ctx.fillRect((x+W/2-9)|0, y+H*0.16|0, 18, 4);         // visor slit
-  ctx.fillStyle=bd.eye;        ctx.fillRect((x+W/2-5)|0, (y+H*0.165)|0, 3,2); ctx.fillRect((x+W/2+2)|0, (y+H*0.165)|0, 3,2);
-  ctx.fillStyle=bd.crack;      ctx.fillRect((x+W/2-2)|0, y+H*0.02|0, 4, H*0.08|0);   // helmet plume
-  if(b.mode==='pull' || b.mode==='roar'){                        // glowing back crack (weak point)
-    const bx = f>0 ? x+3 : x+W-6;
-    drawGlow(ctx, bd.crack, 18, bx+1, y+H*0.46, 1);
-    ctx.fillStyle=bd.crack; ctx.fillRect(bx, y+H*0.3|0, 3, H*0.34|0);
-    ctx.fillStyle='#fff0c0'; ctx.fillRect(bx, (y+H*0.4)|0, 3, 4);
+  const DK = b.dark, pal = DK ? (bd.darkColors||bd) : bd;      // Dark Knight uses the cursed palette
+  const metal=pal.color, dark=pal.dark, trim=pal.trim, lite=shade(metal,20), sh=shade(metal,-24);
+  const eyeCol=pal.eye, crackCol=pal.crack;
+  const cx=x+W/2, Y=(p)=>y+H*p;
+  // dark hand hauling him aloft during the phase-2 transformation
+  if(b.mode==='rise'){ drawDarkHand(b, x, y, W, H); }
+  if(DK) drawDarkCape(x, y, W, H, f, b.t);                                           // tattered cloak behind
+  ctx.fillStyle=dark; ctx.fillRect(f>0? x-2 : x+W-6, Y(0.32), 8, H*0.24);            // back arm (behind)
+  // Proportions: 3-block cuirass (chest), a long 4-block armored skirt (waist), and
+  // short 1-block legs below it — a Dark-Souls-style long-fauld silhouette.
+  // tall legs + boots — leading foot lifts during a stomp/slam wind-up
+  const kneeUp = ((b.mode==='wind' && (b.pendingAtk==='stomp'||b.pendingAtk==='slam')) || b.mode==='slam') ? H*0.13 : 0;
+  const moving = b.mode==='approach' && Math.abs(b.vx)>0.15;
+  const stride = moving ? Math.round(Math.sin(b.t*0.35)*4) : 0;
+  const lL = f<0?kneeUp:0, rL = f>0?kneeUp:0;
+  const lx = x+7 - stride, rx = x+W-20 + stride;
+  ctx.fillStyle=dark; ctx.fillRect(lx, Y(0.60)-lL, 13, H*0.32); ctx.fillRect(rx, Y(0.60)-rL, 13, H*0.32);   // tall legs
+  ctx.fillStyle=sh;   ctx.fillRect(lx, Y(0.60)-lL, 3, H*0.32);  ctx.fillRect(rx, Y(0.60)-rL, 3, H*0.32);
+  ctx.fillStyle=trim; ctx.fillRect(lx, Y(0.72)-lL, 13, 3); ctx.fillRect(rx, Y(0.72)-rL, 13, 3);             // knee bands
+  ctx.fillStyle=metal; ctx.fillRect(lx-4, Y(0.925)-lL, 18, H*0.07); ctx.fillRect(rx-2, Y(0.925)-rL, 18, H*0.07); // boots
+  ctx.fillStyle=lite;  ctx.fillRect(lx-4, Y(0.925)-lL, 18, 2); ctx.fillRect(rx-2, Y(0.925)-rL, 18, 2);
+  // armored skirt / fauld (the "waist") — sits above the tall legs
+  ctx.fillStyle=metal; ctx.beginPath();
+  ctx.moveTo(x+6, Y(0.44)); ctx.lineTo(x+W-6, Y(0.44)); ctx.lineTo(x+W-4, Y(0.60)); ctx.lineTo(x+4, Y(0.60)); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=trim;  ctx.fillRect(x+5, Y(0.44), W-10, 2);                          // belt
+  ctx.fillStyle=sh;    for(let i=1;i<5;i++) ctx.fillRect(x+4+i*(W-8)/5, Y(0.45), 1, H*0.15);   // plate divisions
+  ctx.fillStyle=lite;  for(let i=0;i<6;i++) ctx.fillRect(x+8+i*((W-16)/5), Y(0.47), 2,2);       // rivets
+  ctx.fillStyle=sh;    ctx.fillRect(x+3, Y(0.58), W-6, 2);                           // hem shadow
+  // broad chest / cuirass (the 3-block "body") — tapered from the shoulders
+  ctx.fillStyle=metal; ctx.beginPath();
+  ctx.moveTo(x+3, Y(0.20)); ctx.lineTo(x+W-3, Y(0.20)); ctx.lineTo(x+W-6, Y(0.33)); ctx.lineTo(x+W-8, Y(0.44)); ctx.lineTo(x+8, Y(0.44)); ctx.lineTo(x+6, Y(0.33)); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=lite;  ctx.fillRect(x+4, Y(0.20), W-8, 3);
+  ctx.fillStyle=shade(metal,10); ctx.fillRect(cx-2, Y(0.22), 4, H*0.21);            // sternum ridge
+  ctx.fillStyle=sh;    ctx.fillRect(x+9, Y(0.28), W-18, 1); ctx.fillRect(x+10, Y(0.37), W-20, 1); // pec/ab lines
+  ctx.fillStyle=sh;    ctx.fillRect(x+9, Y(0.42), W-18, 2);
+  // huge angular DIAMOND pauldrons (less square, big spikes-out shoulders)
+  const pauldron=(ox,dir)=>{
+    ctx.fillStyle=dark; ctx.beginPath();
+    ctx.moveTo(ox, Y(0.16)); ctx.lineTo(ox+dir*16, Y(0.16)); ctx.lineTo(ox+dir*26, Y(0.28)); ctx.lineTo(ox+dir*18, Y(0.42)); ctx.lineTo(ox+dir*2, Y(0.40)); ctx.closePath(); ctx.fill();
+    ctx.fillStyle=metal; ctx.beginPath();
+    ctx.moveTo(ox+dir*2, Y(0.18)); ctx.lineTo(ox+dir*15, Y(0.18)); ctx.lineTo(ox+dir*22, Y(0.28)); ctx.lineTo(ox+dir*15, Y(0.39)); ctx.lineTo(ox+dir*4, Y(0.37)); ctx.closePath(); ctx.fill();
+    ctx.fillStyle=lite; ctx.beginPath(); ctx.moveTo(ox+dir*2,Y(0.18)); ctx.lineTo(ox+dir*15,Y(0.18)); ctx.lineTo(ox+dir*20,Y(0.24)); ctx.lineTo(ox+dir*6,Y(0.23)); ctx.closePath(); ctx.fill();
+    ctx.fillStyle=trim; ctx.fillRect(ox+dir*13-1, Y(0.25), 2,2); ctx.fillRect(ox+dir*16-1, Y(0.32), 2,2);
+  };
+  pauldron(x+6,-1); pauldron(x+W-6,1);
+  if(DK){                                                                             // Dark-Souls ornamentation
+    const pspike=(ox,dir)=>{ ctx.fillStyle=trim; for(let k=0;k<3;k++){ const sxp=ox+dir*(12+k*7); ctx.beginPath(); ctx.moveTo(sxp,Y(0.20)); ctx.lineTo(sxp+dir*2,Y(0.06)); ctx.lineTo(sxp+dir*7,Y(0.21)); ctx.closePath(); ctx.fill(); ctx.fillStyle=shade(trim,-26); } };
+    pspike(x+8,-1); pspike(x+W-8,1);                                                  // spiked pauldrons
+    ctx.fillStyle=eyeCol; ctx.globalAlpha=0.9;                                        // glowing rune seams
+    ctx.fillRect(cx-1, Y(0.24), 2, H*0.18);
+    for(let i=0;i<3;i++) ctx.fillRect(x+11, Y(0.28+i*0.05), W-22, 1);
+    ctx.globalAlpha=1; drawGlow(ctx, eyeCol, 16, cx, Y(0.34), 1);
+    ctx.fillStyle=eyeCol; ctx.beginPath(); ctx.arc(cx, Y(0.30), 3, 0, Math.PI*2); ctx.fill();  // chest core
+    ctx.fillStyle='#160b22'; ctx.beginPath(); ctx.arc(cx, Y(0.30), 1.4, 0, Math.PI*2); ctx.fill();
   }
-  if(b.mode==='roar') drawGlow(ctx, '#ffcaa0', 26, x+W/2+f*18, y+H*0.2, 1);
-  drawKnightSword(b, x, y, W, H, f, bd);
+  ctx.fillStyle=dark; ctx.fillRect(cx-6, Y(0.17), 12, H*0.04);                        // gorget
+  // curved horns (bull-like, up and out) — drawn behind the helmet
+  const horn=(bx, dir)=>{
+    ctx.fillStyle=dark; ctx.beginPath();
+    ctx.moveTo(bx, Y(0.07)); ctx.quadraticCurveTo(bx+dir*16, Y(0.03), bx+dir*15, Y(-0.11));
+    ctx.lineTo(bx+dir*9, Y(-0.11)); ctx.quadraticCurveTo(bx+dir*8, Y(0.01), bx+dir*2, Y(0.07)); ctx.closePath(); ctx.fill();
+    ctx.fillStyle=sh; ctx.beginPath();
+    ctx.moveTo(bx, Y(0.07)); ctx.quadraticCurveTo(bx+dir*10, Y(0.03), bx+dir*11, Y(-0.08)); ctx.lineTo(bx+dir*9,Y(-0.11)); ctx.quadraticCurveTo(bx+dir*8,Y(0.01),bx+dir*2,Y(0.07)); ctx.closePath(); ctx.fill();
+  };
+  horn(cx-8,-1); horn(cx+8,1);
+  // angular helmet (bevelled, not a plain square)
+  ctx.fillStyle=metal; ctx.beginPath();
+  ctx.moveTo(cx-8, Y(0.05)); ctx.lineTo(cx+8, Y(0.05)); ctx.lineTo(cx+10, Y(0.10)); ctx.lineTo(cx+9, Y(0.21)); ctx.lineTo(cx-9, Y(0.21)); ctx.lineTo(cx-10, Y(0.10)); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=lite; ctx.fillRect(cx-8, Y(0.05), 16, 2);
+  ctx.fillStyle=sh;   ctx.fillRect(cx-10, Y(0.10), 2, H*0.11);
+  ctx.fillStyle='#0e0d10'; ctx.fillRect(cx-7, Y(0.09), 14, 4); ctx.fillRect(cx-2, Y(0.09), 4, H*0.11); // T-visor
+  ctx.fillStyle=eyeCol; ctx.fillRect(cx + (f>0? 3 : -5), Y(0.10), 3, 2);          // ONE eye (facing side)
+  if(DK){ drawGlow(ctx, eyeCol, 10, cx+(f>0?4:-4), Y(0.11), 1); }                 // cursed eye-glow
+  // arms — upper arm from each pauldron down toward the grip (both sides visible)
+  drawKnightArms(x, y, W, H, f, metal, dark, trim, b.mode);
+  // weapon (Dark Knight wields a great SWORD; the Fallen Knight a viking axe)
+  if(b.mode==='javelin'){
+    // Cock the throwing arm back while charging, then swing it forward to release —
+    // so you clearly SEE him charge and throw.
+    const chg = clamp(1 - b.modeTimer/1900, 0, 1);
+    const throwP = clamp((chg-0.60)/0.18, 0, 1);
+    const shX=cx+f*W*0.12, shY=Y(0.22);
+    const backX=cx-f*W*0.34, backY=Y(0.13);              // cocked behind the head
+    const fwdX =cx+f*W*0.66, fwdY =Y(0.34);              // thrust out front
+    const handX=backX+(fwdX-backX)*throwP, handY=backY+(fwdY-backY)*throwP;
+    ctx.strokeStyle=metal; ctx.lineWidth=7; ctx.lineCap='round';                       // throwing arm
+    ctx.beginPath(); ctx.moveTo(shX,shY); ctx.lineTo(handX,handY); ctx.stroke();
+    ctx.lineWidth=1; ctx.lineCap='butt';
+    ctx.fillStyle=trim; ctx.fillRect(handX-4, handY-4, 8, 8);                           // gauntlet hand
+    if(!b.thrown){
+      const px=state.player.x+state.player.w/2-state.camX, py=state.player.y+state.player.h/2-state.camY;
+      const aimAng=Math.atan2(py-handY, px-handX), cockAng=f>0?-2.3:(Math.PI+2.3);
+      const jang=cockAng+(aimAng-cockAng)*throwP;                                       // swings from cocked to aimed
+      drawJavelin(handX, handY, jang, 144, true);                                        // long void javelin, charging
+      drawGlow(ctx, eyeCol, 12+chg*20, handX, handY, 1);                                // charge glow grows
+    } else {
+      ctx.strokeStyle='rgba(200,120,255,0.55)'; ctx.lineWidth=3; ctx.lineCap='round';   // release streak
+      ctx.beginPath(); ctx.moveTo(handX,handY); ctx.lineTo(handX+f*26, handY+12); ctx.stroke();
+      ctx.lineWidth=1; ctx.lineCap='butt';
+    }
+  } else if(b.mode==='pull'||b.mode==='roar'){
+    drawKnightSword(b, x, y, W, H, f, pal, DK);                                        // weapon planted in the ground
+    ctx.fillStyle=trim; ctx.fillRect(f>0? x+W-2 : x-6, Y(0.5), 8, 7);                  // hand gripping it
+  } else if(b.mode==='stab' || b.mode==='slam' || b.mode==='spikedrag'){
+    const dur = b.atkDur || (b.mode==='slam'?220:b.mode==='spikedrag'?260:380);
+    const prog = clamp(1 - b.modeTimer/dur, 0, 1), e=1-(1-prog)*(1-prog);
+    // slam chops straight down; spikedrag rakes low across the ground; stab thrusts forward
+    const end = b.mode==='slam' ? (2*Math.PI+Math.PI*0.45)
+              : b.mode==='spikedrag' ? (2*Math.PI+Math.PI*0.40)
+              : (2*Math.PI+Math.PI*0.25);
+    const bladeAng = Math.PI*1.25 + (end - Math.PI*1.25)*e;                            // 225° -> forward/down
+    drawKnightSlash(x, y, W, H, f, Math.PI*1.25, bladeAng);                            // visible swing trail
+    drawKnightWeapon(x, y, W, H, f, pal, bladeAng, DK);
+  } else {
+    drawKnightHold(x, y, W, H, f, pal, DK);                                            // two-handed carry (face visible)
+  }
+  // back crack (weak point)
+  if(b.mode==='pull' || b.mode==='roar'){
+    const bx = f>0 ? x+3 : x+W-6;
+    drawGlow(ctx, crackCol, 20, bx+1, Y(0.44), 1);
+    ctx.fillStyle=crackCol; ctx.fillRect(bx, Y(0.28), 3, H*0.3);
+    ctx.fillStyle=DK?'#f0d0ff':'#fff0c0'; ctx.fillRect(bx, Y(0.4), 3, 5);
+  }
+  // roar — expanding white sound rings radiating in a full CIRCLE around him
+  if(b.mode==='roar'){
+    drawGlow(ctx, '#ffcaa0', 24, cx+f*16, Y(0.13), 1);
+    const prog = 1 - clamp((b.roarTimer||0)/2000, 0, 1);
+    const ox = cx+f*4, oy = Y(0.12);                        // rings start at his head
+    for(let k=0;k<3;k++){
+      const rp = ((prog*1.7)+k*0.34)%1;
+      ctx.globalAlpha=(1-rp)*0.8; ctx.strokeStyle='#ffffff'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(ox, oy, 8+rp*64, 0, Math.PI*2); ctx.stroke();   // full ring
+    }
+    ctx.globalAlpha=1; ctx.lineWidth=1;
+    ctx.fillStyle='#ffffff';                                // white pixels flung outward all around
+    for(let k=0;k<8;k++){ const ang=k/8*Math.PI*2, rr=10+((prog*60+k*7)%56);
+      ctx.fillRect((ox+Math.cos(ang)*rr)|0, (oy+Math.sin(ang)*rr)|0, 2,2); }
+  }
 }
 function drawBoss(b, bd){
   if(b.type==='knight'){ drawKnight(b, bd); return; }
@@ -989,17 +1309,88 @@ export function render(){
     ctx.fillStyle='#3a2a1a'; ctx.font='6px monospace'; ctx.fillText('SHOP',vx-2,vy-2);
   }
 
-  // ground spikes (knight boss)
+  // ground spikes (knight boss) — each erupts at its own angle (45°/30°/15°)
   for(const s of state.spikes){
     if(s.delay>0) continue;
-    const ssx=s.x-state.camX, baseY=s.topY-state.camY, hh=s.len*(s.grow||0);
-    const a=clamp(s.life/400,0,1);
-    ctx.globalAlpha=a;
+    const el=s.el||Math.PI/4, dir=s.dir||1, L=s.len*(s.grow||0), hw=(s.width||16)/2;
+    const dxn=dir*Math.cos(el), dyn=-Math.sin(el);       // spike direction
+    const px=-dyn, py=dxn;                                // perpendicular (base width)
+    const bx=s.x-state.camX, by=s.topY-state.camY, tx=bx+dxn*L, ty=by+dyn*L;
+    ctx.globalAlpha=clamp(s.life/300,0,1);
     ctx.fillStyle='#7c828c';
-    ctx.beginPath(); ctx.moveTo(ssx-5,baseY); ctx.lineTo(ssx+5,baseY); ctx.lineTo(ssx,baseY-hh); ctx.closePath(); ctx.fill();
-    ctx.fillStyle='#c2c8d0';
-    ctx.beginPath(); ctx.moveTo(ssx-1,baseY); ctx.lineTo(ssx+2,baseY-hh*0.7); ctx.lineTo(ssx,baseY-hh); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(bx-px*hw,by-py*hw); ctx.lineTo(bx+px*hw,by+py*hw); ctx.lineTo(tx,ty); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#c2c8d0';                              // lit edge
+    ctx.beginPath(); ctx.moveTo(bx-px*hw,by-py*hw); ctx.lineTo(bx-px*hw*0.3,by-py*hw*0.3); ctx.lineTo(tx,ty); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#565c66';                              // shaded edge
+    ctx.beginPath(); ctx.moveTo(bx+px*hw,by+py*hw); ctx.lineTo(bx+px*hw*0.3,by+py*hw*0.3); ctx.lineTo(tx,ty); ctx.closePath(); ctx.fill();
     ctx.globalAlpha=1;
+  }
+
+  // Dark Knight's raining swords: a telegraph beam/marker while they hang, then
+  // a plunging spectral blade.
+  for(const s of state.skySwords){
+    const sx=s.x-state.camX, gy=s.groundY-state.camY, len=s.len||56;
+    if(s.telegraph>0){
+      const pulse=0.35+0.45*Math.abs(Math.sin(state.time*0.012));
+      ctx.globalAlpha=pulse; ctx.strokeStyle='#c060ff'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(sx, s.y-state.camY); ctx.lineTo(sx, gy); ctx.stroke();  // aim beam
+      ctx.globalAlpha=pulse*0.9; ctx.fillStyle='#c060ff';
+      ctx.fillRect(sx-8, gy-2, 16, 3);                                                     // ground marker
+      ctx.fillRect(sx-2, gy-6, 4, 5);
+      ctx.globalAlpha=0.5; drawSkyBlade(sx, s.y-state.camY, len, true);                    // forming ghost blade
+      ctx.globalAlpha=1; ctx.lineWidth=1;
+    } else {
+      drawGlow(ctx, 'rgba(150,70,220,0.5)', 16, sx, s.y-state.camY+len*0.4, 1);
+      drawSkyBlade(sx, s.y-state.camY, len, false);
+    }
+  }
+
+  // Dark Knight's GIANT black/purple fire pillars erupting from the ground
+  for(const c of state.darkFire){
+    const fx=c.x-state.camX, gy=c.groundY-state.camY;
+    if(c.telegraph>0){                                   // telegraph: pulsing scar + embers on the ground
+      const pulse=0.35+0.45*Math.abs(Math.sin(state.time*0.025));
+      ctx.globalAlpha=pulse; drawGlow(ctx,'#8a2ad0',30,fx,gy,2);
+      ctx.fillStyle='#c060ff'; ctx.fillRect(fx-18, gy-1, 36, 3);
+      for(let k=-2;k<=2;k++) ctx.fillRect(fx+k*9-1, gy-4, 2, 5);
+      ctx.globalAlpha=1;
+      continue;
+    }
+    const h=(c.h||150)*(c.grow||0), fade=clamp(c.life/280,0,1);
+    const T=state.time*0.018, base=c.x*0.07;
+    ctx.globalAlpha=fade;
+    drawGlow(ctx,'rgba(140,40,220,0.5)',34,fx,gy-h*0.35,2);          // ambient light cast on the ground
+    // three flame tongues per pillar, each a wavering teardrop, layered black->purple->bright
+    const layers=[['#0c0016',34],['#3a0a66',26],['#7a1ad0',17],['#c983ff',8]];
+    for(let li=0; li<layers.length; li++){
+      const [col,bw]=layers[li];
+      ctx.fillStyle=col;
+      for(let tongue=-1; tongue<=1; tongue++){
+        const tx = fx + tongue*bw*0.34, th = h*(tongue===0?1:0.7);
+        ctx.beginPath(); ctx.moveTo(tx-bw/2, gy);
+        const segs=7;
+        for(let s2=0;s2<=segs;s2++){                     // right side up to the flickering tip
+          const g=s2/segs, fy=gy-th*g, taper=bw*(1-g*0.92)/2;
+          const flick=Math.sin(T+g*4+base+li+tongue)*bw*0.30*g;
+          ctx.lineTo(tx+flick+taper, fy);
+        }
+        for(let s2=segs;s2>=0;s2--){                     // back down the left side
+          const g=s2/segs, fy=gy-th*g, taper=bw*(1-g*0.92)/2;
+          const flick=Math.sin(T+g*4+base+li+tongue+2.1)*bw*0.30*g;
+          ctx.lineTo(tx+flick-taper, fy);
+        }
+        ctx.closePath(); ctx.fill();
+      }
+    }
+    // rising embers/sparks
+    ctx.fillStyle='#e6b3ff';
+    for(let k=0;k<4;k++){ const g=((T*4+k*7+base)%10)/10; ctx.fillRect((fx+Math.sin(T+k)*10)|0, (gy-h*g)|0, 2,2); }
+    ctx.globalAlpha=1;
+  }
+
+  // Dark Knight's flying void javelin
+  for(const j of state.javelins){
+    drawJavelin(j.x-state.camX, j.y-state.camY, j.ang||Math.atan2(j.vy,j.vx), 144, true);
   }
 
   // boss
@@ -1017,8 +1408,12 @@ export function render(){
   // (the held weapon is drawn AFTER pixelateFrame so it keeps FINER pixels than
   // the chunky world/player — see below.)
 
-  // darkness overlay when underground (lit by player + torches)
-  if(underground){
+  // darkness overlay when underground (lit by player + torches) — but a boss
+  // arena is fully lit, so skip the darkness while the player is inside one
+  let inArenaNow = false;
+  { const ptx=Math.floor(p.x/TILE), pty=Math.floor(p.y/TILE);
+    for(const a of (world.arenas||[])){ if(ptx>a.x0-1 && ptx<a.x0+a.w+1 && pty>a.y0-1 && pty<a.y0+a.h+1){ inArenaNow=true; break; } } }
+  if(underground && !inArenaNow){
     if(!offCanvas || offCanvas.width!==canvas.width || offCanvas.height!==canvas.height){
       offCanvas = document.createElement('canvas');
       offCanvas.width = canvas.width; offCanvas.height = canvas.height;

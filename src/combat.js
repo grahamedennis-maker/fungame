@@ -44,7 +44,7 @@ export function tryMob(){
 export function doAttack(){
   const now = performance.now();
   const tool = currentTool();
-  const cd = tool && tool.tool==='sword' ? 1500 : tool && tool.tool==='hammer' ? 550 : 260;
+  const cd = tool && tool.tool==='sword' ? 500 : tool && tool.tool==='hammer' ? 550 : 260;
   if(now - state.lastAttack < cd) return;
   state.lastAttack = now;
   state.swingStart = now;

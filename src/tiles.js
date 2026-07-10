@@ -109,6 +109,14 @@ export const ITEMS = {
   gold_sword:  { name:'Gold Broadsword', color:'#ffe040', stack:1, tool:'sword', dmg:18, range:29 },
   titanium_pickaxe:{ name:'Titanium Pickaxe', color:'#c0a8d8', stack:1, tool:'pick', tier:4, power:4.2, dmg:13, glow:true },
   meteorite_pickaxe:{ name:'Meteorite Pickaxe', color:'#ff8a6a', stack:1, tool:'pick', tier:4, power:5.0, dmg:16, glow:true },
+  // pickaxes for every remaining metal ore (not wood/coal)
+  copper_pickaxe:  { name:'Copper Pickaxe',   color:'#e08b4a', stack:1, tool:'pick', tier:1, power:1.4, dmg:5 },
+  tin_pickaxe:     { name:'Tin Pickaxe',      color:'#cfc39a', stack:1, tool:'pick', tier:1, power:1.5, dmg:5 },
+  lead_pickaxe:    { name:'Lead Pickaxe',     color:'#8f96a8', stack:1, tool:'pick', tier:1, power:1.8, dmg:6 },
+  silver_pickaxe:  { name:'Silver Pickaxe',   color:'#e8ecf2', stack:1, tool:'pick', tier:2, power:2.0, dmg:7 },
+  tungsten_pickaxe:{ name:'Tungsten Pickaxe', color:'#aeb8ad', stack:1, tool:'pick', tier:2, power:2.6, dmg:8 },
+  platinum_pickaxe:{ name:'Platinum Pickaxe', color:'#dfeaf5', stack:1, tool:'pick', tier:3, power:3.2, dmg:9 },
+  cobalt_pickaxe:  { name:'Cobalt Pickaxe',   color:'#4a9be0', stack:1, tool:'pick', tier:3, power:3.6, dmg:11, glow:true },
   meteorite_sword:{ name:'Meteorite Broadsword', color:'#ff7a4a', stack:1, tool:'sword', dmg:26, range:34, glow:true, special:'magma', specialCd:5000 },
   // swords for the remaining metals so every ore (except coal) crafts into gear
   tin_sword:     { name:'Tin Broadsword',      color:'#cfc39a', stack:1, tool:'sword', dmg:8,  range:26 },

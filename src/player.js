@@ -1,7 +1,7 @@
-import { WORLD_W, WORLD_H, TILE, GRAVITY, MOVE_SPEED, JUMP_VEL, WATER } from './constants.js';
+import { WORLD_W, WORLD_H, TILE, GRAVITY, MOVE_SPEED, JUMP_VEL, WATER, AIR } from './constants.js';
 import { clamp } from './utils.js';
 import { state, world } from './state.js';
-import { tileAt, tileSolid, tileDef } from './worldgen.js';
+import { tileAt, tileSolid, tileDef, setTile } from './worldgen.js';
 import { totalDefense } from './inventory.js';
 
 const CLIMB_SPEED = 2.2;
@@ -116,6 +116,14 @@ export function killPlayer(){
   const p = state.player;
   document.getElementById('deathmsg').style.display='block';
   setTimeout(()=>{ document.getElementById('deathmsg').style.display='none'; },1800);
+  // dying inside a boss arena reopens its gate and dismisses the boss
+  if(state.boss && state.boss.type==='knight' && state.boss.arena){
+    const a=state.boss.arena;
+    for(let gy=a.gateY; gy<a.gateY+a.gateH; gy++){ setTile(a.gateX,gy,AIR); setTile(a.gateX-1,gy,AIR); }
+    a.triggered=false; state.spikes.length=0; state.skySwords.length=0; state.darkFire.length=0; state.javelins.length=0; state.boss=null;
+    const hud=document.getElementById('bosshud'); if(hud) hud.style.display='none';
+  }
+  p.stun=0;
   const sx = Math.floor(WORLD_W*0.25);
   p.x = sx*TILE; p.y = (world.surface[sx]-3)*TILE;
   p.vx=0; p.vy=0; p.hp = p.maxhp; p.invuln=1500;

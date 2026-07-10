@@ -26,7 +26,14 @@ export const RECIPES = [
   { out:'titanium_bar', n:1, station:'furnace', req:{titanium_ore:2,coal:2} },
   { out:'meteorite_bar',n:1, station:'furnace', req:{meteorite_ore:2,coal:3} },
 
-  // ---- METAL TOOLS: copper -> iron -> gold -> titanium/meteorite ----
+  // ---- METAL TOOLS: a pickaxe for every metal ore (not wood/coal) ----
+  { out:'copper_pickaxe', n:1, station:'table', req:{copper_bar:5,wood:2} },
+  { out:'tin_pickaxe', n:1, station:'table', req:{tin_bar:5,wood:2} },
+  { out:'lead_pickaxe', n:1, station:'table', req:{lead_bar:5,wood:2} },
+  { out:'silver_pickaxe', n:1, station:'table', req:{silver_bar:5,wood:2} },
+  { out:'tungsten_pickaxe', n:1, station:'table', req:{tungsten_bar:5,wood:2} },
+  { out:'platinum_pickaxe', n:1, station:'table', req:{platinum_bar:5,wood:2} },
+  { out:'cobalt_pickaxe', n:1, station:'table', req:{cobalt_bar:5,wood:2} },
   { out:'iron_pickaxe', n:1, station:'table', req:{iron_bar:5,wood:2} },
   { out:'iron_sword', n:1, station:'table', req:{iron_bar:4,wood:2} },
   { out:'gold_pickaxe', n:1, station:'table', req:{gold_bar:5,wood:2} },

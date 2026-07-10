@@ -33,9 +33,12 @@ export const BOSS_TYPES = {
   // then. 15 back-hits kill him. Uses hp as the 15-hit counter.
   knight: {
     name:'The Fallen Knight', color:'#5b6472', dark:'#333a44', trim:'#8a94a4', eye:'#ff5a4a', crack:'#ff8a3c',
-    w:46, h:94, hp:15, maxhp:15, ground:true,
+    w:46, h:94, hp:1, maxhp:1, ground:true,
     drop:{ coin:250, titanium_bar:8, cobalt_bar:5, meteorite_bar:3, meteorite_sword:1 },
     projColor:'#c0c8d4',
+    // phase 2: after a single back-hit a dark hand raises him into a 12-block Dark Knight
+    darkName:'The Dark Knight', darkHits:6,
+    darkColors:{ color:'#2a2434', dark:'#140f1c', trim:'#8a44c8', eye:'#c060ff', crack:'#c060ff' },
   },
   // Mini-boss summoned when you claim the relic legendary from its altar.
   guardian: {
@@ -78,21 +81,47 @@ export function spawnKnight(arena){
     hp:def.hp, maxhp:def.maxhp, vx:0, vy:0, facing:-1, t:0,
     groundY: floorY, onGround:true, arena,
     mode:'approach', modeTimer:1100, atkCount:0, pullTimer:0, roarTimer:0, backHits:0, shake:0,
+    phase:1, dark:false, scale:1,
   };
   document.getElementById('bossname').textContent = def.name;
   document.getElementById('bosshud').style.display='block';
   msg('⚔ The Fallen Knight rises! Strike the glowing crack on his back while his sword is stuck. ⚔');
 }
 function knightRect(p, x, y, w, h){ return p.x+p.w>x && p.x<x+w && p.y+p.h>y && p.y<y+h; }
-function knightResetFlags(b){ b.stomped=false; b.spiked=false; b.slammed=false; }
+function knightResetFlags(b){ b.stomped=false; b.spiked=false; b.slammed=false; b.cast=false; }
+// Begin the phase-2 transformation: a dark hand hauls the fallen knight aloft.
+function knightStartRise(b){
+  b.mode='rise'; b.riseTimer=2400; b.vx=0; b.vy=0; b.pullTimer=0; b.roarTimer=0;
+  state.spikes.length=0;
+  state.flashes.push({ color:'rgba(30,0,50,0.55)', life:400 });
+  document.getElementById('bossname').textContent = BOSS_TYPES.knight.darkName;
+  msg('A DARK HAND erupts from the ground and seizes the fallen knight...');
+}
+// Complete the transformation into the 12-block Dark Knight (phase 2).
+function knightBecomeDark(b){
+  const def = BOSS_TYPES.knight;
+  const oldcx = b.x + b.w/2;
+  b.w = 48; b.h = 160;                               // 10 blocks tall, 3 blocks wide
+  b.scale = b.h/def.h;
+  b.x = oldcx - b.w/2; b.y = b.groundY - b.h; b.vy = 0; b.onGround = true;
+  b.dark = true; b.phase = 2;
+  b.hp = def.darkHits; b.maxhp = def.darkHits; b.backHits = 0;
+  b.mode='approach'; b.modeTimer=1400; b.atkCount=0;
+  knightResetFlags(b);
+  for(let i=0;i<44;i++) spawnParticles(oldcx+ri(-46,46), b.y+ri(0,b.h), chance(0.5)?'#7a2ab0':'#1a0a2a', 1);
+  state.flashes.push({ color:'rgba(70,0,110,0.6)', life:520 });
+  document.getElementById('bosshpfill').style.width = '100%';
+  msg('⚔ THE DARK KNIGHT RISES — cursed steel, twelve blocks tall. Break his back once more! ⚔');
+}
 function knightStartAttack(b, atk){
   b.pendingAtk = atk; b.mode='wind';
-  b.modeTimer = atk==='slam'?650 : atk==='spikedrag'?720 : 420;
+  b.modeTimer = atk==='slam'?650 : atk==='spikedrag'?720 : atk==='stomp'?500 : 420; // stomp: 0.5s knee-lift
   knightResetFlags(b);
 }
 function updateKnight(b, def, dt){
   const p = state.player;
   b.t = (b.t||0)+dt;
+  const S = b.scale||1, dm = b.dark?1.7:1;      // size + damage scale (phase 2 = Dark Knight)
   const pcx=p.x+p.w/2, bcx=b.x+b.w/2, dx=pcx-bcx;
   // gravity + rest on the arena floor
   b.vy += 0.55*dt; b.y += b.vy*dt;
@@ -102,49 +131,124 @@ function updateKnight(b, def, dt){
   b.shake = (b.mode==='pull') ? Math.sin(b.t*22)*2 : 0;
 
   switch(b.mode){
+    case 'rise': {                                     // dark hand lifts him -> becomes the Dark Knight
+      b.vx=0; b.vy=0; b.riseTimer -= dt*16.7;
+      const total=2400, t=clamp(1-b.riseTimer/total,0,1);
+      b.y = b.groundY - b.h - Math.sin(Math.min(1,t*1.15)*Math.PI)*80;   // hauled up, then set down
+      if(chance(0.7)) spawnParticles(bcx+ri(-30,30), b.y+ri(0,b.h), chance(0.5)?'#3a1050':'#7a2ab0', 1);
+      if(b.riseTimer<=0) knightBecomeDark(b);
+      break;
+    }
+    case 'levitate': {                                 // floats up, rains conjured swords where you stood
+      b.vx=0; b.vy=0;
+      const hoverY = b.groundY - b.h - 130*S;
+      b.y += (hoverY - b.y)*0.10;                       // ease up into the air
+      b.facing = dx>0?1:-1;
+      if(!b.cast && b.modeTimer < 1050){                // conjure the falling swords partway through
+        b.cast=true;
+        const px = b.castX!=null ? b.castX : pcx;       // where the player was standing
+        for(let i=0;i<6;i++){
+          const sxx = px + (i-2.5)*38*S + ri(-6,6);
+          state.skySwords.push({ x:sxx, y:b.groundY - (300+ri(0,50))*S, vy:0,
+            telegraph:600+i*70, dmg:Math.round(24*(b.dark?1.7:1)), groundY:b.groundY, len:128 });  // 8-block blades
+        }
+        state.flashes.push({ color:'rgba(90,30,150,0.22)', life:180 });
+        msg('The Dark Knight levitates — a rain of swords falls where you stood!');
+      }
+      if(b.modeTimer<=0){ b.mode='recover'; b.modeTimer=520; knightResetFlags(b); }
+      break;
+    }
+    case 'darkfire': {                                 // black/purple fire erupts from the ground in a wave
+      b.vx=0; const dir=b.facing;
+      if(!b.cast && b.modeTimer < 950){
+        b.cast=true;
+        for(let i=0;i<6;i++)                            // a spreading row of flame pillars out front, 3 blocks apart
+          state.darkFire.push({ x:bcx + dir*(56 + i*104), groundY:b.groundY, telegraph:260+i*130, life:1000, max:1000, h:170, grow:0, dmg:Math.round(20*dm) });
+        for(let i=0;i<2;i++)                            // a couple behind so you can't just hug his back
+          state.darkFire.push({ x:bcx - dir*(60 + i*104), groundY:b.groundY, telegraph:320+i*130, life:1000, max:1000, h:170, grow:0, dmg:Math.round(20*dm) });
+        state.flashes.push({ color:'rgba(50,0,80,0.28)', life:200 });
+        msg('The Dark Knight calls up black flames from the earth!');
+      }
+      if(b.modeTimer<=0){                               // plants his sword -> vulnerable window (hit his back!)
+        for(let i=0;i<18;i++) state.particles.push({ x:bcx+dir*40*S+ri(-8,8), y:b.groundY, vx:ri(-2,2), vy:-ri(3,7), life:600, color:i%2?'#7a3ab0':'#1a0a2a' });
+        b.mode='pull'; b.pullTimer=3500;
+      }
+      break;
+    }
+    case 'javelin': {                                  // sword vanishes into the void; he conjures & hurls a javelin
+      b.vx=0; b.vy=0; const total=1900, t=clamp(1-b.modeTimer/total,0,1);
+      const hoverY = b.groundY - b.h - 60*S;             // stay low enough that you can see him charge & throw
+      if(t<0.22 && chance(0.7))                        // the great sword dissolves into shadow
+        spawnParticles(bcx + b.facing*b.w*0.3 + ri(-8,8), b.y+b.h*0.22+ri(-20,20), chance(0.5)?'#2a0a44':'#7a2ab0', 1);
+      b.y += (hoverY - b.y)*0.08;                      // levitate into the air
+      b.facing = dx>0?1:-1;
+      if(t>=0.22 && t<0.72 && chance(0.6)){            // charge — void energy spirals into the javelin
+        const hx=bcx+b.facing*b.w*0.45, hy=b.y+b.h*0.28, a=Math.random()*Math.PI*2, r=16+Math.random()*12;
+        state.particles.push({ x:hx+Math.cos(a)*r, y:hy+Math.sin(a)*r, vx:-Math.cos(a)*1.3, vy:-Math.sin(a)*1.3, life:280, color:chance(0.5)?'#c060ff':'#3a1050' });
+      }
+      if(!b.thrown && t>=0.78){                        // hurl it at the player's position
+        b.thrown=true;
+        const hx=bcx+b.facing*b.w*0.45, hy=b.y+b.h*0.28;
+        const ang=Math.atan2((p.y+p.h*0.5)-hy, (p.x+p.w/2)-hx), sp=24;
+        state.javelins.push({ x:hx, y:hy, vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp, dmg:Math.round(30*dm), life:2600 });
+        state.flashes.push({ color:'rgba(90,30,150,0.20)', life:150 });
+        msg('The Dark Knight hurls a void javelin!');
+      }
+      if(b.modeTimer<=0){ b.mode='recover'; b.modeTimer=520; }
+      break;
+    }
     case 'approach':
-      b.vx = Math.sign(dx)*Math.min(Math.abs(dx)*0.02, 1.15); b.x += b.vx*dt;
+      b.vx = Math.sign(dx)*Math.min(Math.abs(dx)*0.02, 1.15*(b.dark?1.4:1)); b.x += b.vx*dt;
       if(b.modeTimer<=0){
         b.atkCount=(b.atkCount||0)+1;
-        const close = Math.abs(dx)<95;
-        let atk = (b.atkCount%3===0) ? 'slam' : (!close ? 'spikedrag' : (chance(0.5)?'stab':'stomp'));
-        knightStartAttack(b, atk);
+        // The Dark Knight has his OWN moveset (levitate sword-rain + black fire); the
+        // black-fire ends by planting his sword, which is your window to hit his back.
+        const atks = b.dark ? ['javelin','darkfire','levitate','darkfire']
+                            : ['stab','spikedrag','stomp','slam'];
+        const atk = atks[(b.atkCount-1) % atks.length];
+        if(atk==='levitate'){ b.mode='levitate'; b.modeTimer=1700; b.castX=state.player.x+state.player.w/2; knightResetFlags(b); }
+        else if(atk==='darkfire'){ b.mode='darkfire'; b.modeTimer=1300; knightResetFlags(b); }
+        else if(atk==='javelin'){ b.mode='javelin'; b.modeTimer=1900; knightResetFlags(b); b.thrown=false; }
+        else knightStartAttack(b, atk);
       }
       break;
     case 'wind':
       b.vx=0;
-      if(b.modeTimer<=0){ b.mode=b.pendingAtk; b.modeTimer = b.pendingAtk==='stab'?380:b.pendingAtk==='stomp'?320:b.pendingAtk==='spikedrag'?260:220; }
+      if(b.modeTimer<=0){ b.mode=b.pendingAtk; b.modeTimer = b.pendingAtk==='stab'?380:b.pendingAtk==='stomp'?320:b.pendingAtk==='spikedrag'?260:220; b.atkDur=b.modeTimer; }
       break;
     case 'stab': {                                     // thrust — a low hitbox you can JUMP over
-      b.vx=0; const reach=64, hy=b.y+b.h*0.56, hh=16;
+      b.vx=0; const reach=118*S, hy=b.y+b.h*0.56, hh=16*S;  // reach matches the lengthened weapon
       const hx = b.facing>0 ? b.x+b.w : b.x-reach;
-      if(knightRect(p,hx,hy,reach,hh)) damagePlayer(20);
+      if(knightRect(p,hx,hy,reach,hh)) damagePlayer(20*dm);
       if(b.modeTimer<=0){ b.mode='recover'; b.modeTimer=480; }
       break;
     }
-    case 'stomp':                                      // stomp — stuns the grounded player
+    case 'stomp':                                      // stomp — dust flies UP + stuns the grounded player
       b.vx=0;
       if(!b.stomped){ b.stomped=true;
-        state.flashes.push({color:'rgba(120,120,140,0.28)',life:130});
-        for(let i=0;i<18;i++) spawnParticles(bcx+ri(-30,30), b.groundY, '#9aa0ac', 1);
-        if(p.onGround && Math.abs(pcx-bcx)<140){ p.stun=1700; p.vy=-3; msg('Stunned!'); }
+        state.flashes.push({color:'rgba(120,120,140,0.30)',life:150});
+        for(let i=0;i<28;i++) state.particles.push({ x:bcx+ri(-46*S,46*S), y:b.groundY, vx:ri(-2,2), vy:-ri(4,9), life:680, color:i%2?'#9aa0ac':'#6b7078' });
+        if(p.onGround && Math.abs(pcx-bcx)<150*S){ p.stun=1700; p.vy=-3; msg('Stunned!'); }
       }
-      if(b.modeTimer<=0){ b.mode='recover'; b.modeTimer=520; }
+      // follow the stomp with a normal stab while the player is still stunned
+      if(b.modeTimer<=0){ b.facing = pcx>bcx?1:-1; b.mode='stab'; b.modeTimer=360; b.atkDur=360; }
       break;
-    case 'spikedrag':                                  // rakes the ground -> a line of 5-block spikes
+    case 'spikedrag':                                  // rakes the ground -> 3 spikes at 45°
       b.vx=0;
       if(!b.spiked){ b.spiked=true;
-        for(let i=1;i<=6;i++){ const sx=bcx + b.facing*(i*22);
-          state.spikes.push({ x:sx, topY:b.groundY, len:80, life:3000, max:3000, grow:0, delay:i*80 }); }
+        const base = bcx + b.facing*42*S;             // all erupt from the same area
+        const els = [Math.PI/4, Math.PI/6, Math.PI/12];   // 45°, 30°, 15° from the ground
+        for(let i=0;i<3;i++){
+          state.spikes.push({ x:base+i*8*S*b.facing, topY:b.groundY, len:118*S, el:els[i], dir:b.facing, width:16*S, life:1000, max:1000, grow:0, delay:i*90 }); }
         msg('The Knight rakes the ground — spikes erupt!');
       }
       if(b.modeTimer<=0){ b.mode='recover'; b.modeTimer=520; }
       break;
-    case 'slam':                                       // slam sword into ground -> stuck; strain to pull it out
+    case 'slam':                                       // swing the weapon DOWN, plant it, then strain to pull it out
       b.vx=0;
-      if(!b.slammed){ b.slammed=true;
-        for(let i=0;i<20;i++) spawnParticles(bcx+b.facing*30, b.groundY, '#c0c8d4', 1);
-        state.flashes.push({color:'rgba(160,170,190,0.22)',life:130});
+      if(b.modeTimer<=0){                              // the weapon reaches the ground -> plant + impact
+        for(let i=0;i<24;i++) state.particles.push({ x:bcx+b.facing*34*S+ri(-8,8), y:b.groundY, vx:ri(-2,2), vy:-ri(4,8), life:640, color:i%2?'#c0c8d4':'#9aa0ac' });
+        state.flashes.push({color:'rgba(160,170,190,0.24)',life:140});
         b.mode='pull'; b.pullTimer=3500;
       }
       break;
@@ -162,26 +266,87 @@ function updateKnight(b, def, dt){
       b.vx=0; if(b.modeTimer<=0){ b.mode='approach'; b.modeTimer=ri(650,1200); knightResetFlags(b); }
       break;
   }
+  // shadowy aura wisping off the Dark Knight's cursed blade
+  if(b.dark && chance(0.6)){
+    const wx = bcx + b.facing*b.w*0.22, wy = b.y + b.h*0.12;
+    state.particles.push({ x:wx+ri(-12,12), y:wy+ri(-26,24), vx:ri(-1,1)*0.4, vy:-ri(1,4)*0.3, life:ri(320,640), color:chance(0.5)?'#2a1240':'#6a2a9a' });
+  }
   // keep him inside the arena
   const ax0=(b.arena.x0+1)*TILE, ax1=(b.arena.x0+b.arena.w-1)*TILE;
   b.x = clamp(b.x, ax0, ax1-b.w);
-  // walking-into-him contact damage (not while stuck/roaring)
-  if(b.mode!=='pull' && b.mode!=='roar' && b.mode!=='slam' &&
-     Math.abs(bcx-pcx)<b.w/2+6 && p.y+p.h>b.y && p.y<b.y+b.h) damagePlayer(14);
+  // walking into him hurts — except while his sword is stuck (pull/roar), so you
+  // can safely circle to his back. Uses his full body width so it's reliable.
+  if(b.mode!=='pull' && b.mode!=='roar' && b.mode!=='rise' && b.mode!=='levitate' &&
+     pcx > b.x-4 && pcx < b.x+b.w+4 && p.y+p.h > b.y+8 && p.y < b.y+b.h) damagePlayer(14*dm);
   document.getElementById('bosshpfill').style.width = (100*b.hp/b.maxhp)+'%';
 }
 
 // Ground spikes (from spikedrag) rise, damage the player, and fade after 3s.
 export function updateSpikes(dt){
-  const p=state.player;
+  const p=state.player, C=Math.SQRT1_2;   // cos/sin 45°
   for(let i=state.spikes.length-1;i>=0;i--){
     const s=state.spikes[i];
     if(s.delay>0){ s.delay-=dt*16.7; continue; }
+    if(!s.erupted){ s.erupted=true;                       // stone bursts out of the ground
+      for(let k=0;k<14;k++) spawnParticles(s.x+ri(-6,6), s.topY, k%2?'#8a8f98':'#6b7078', 1);
+    }
     s.life -= dt*16.7;
-    s.grow = Math.min(1, (s.grow||0) + dt*0.12);
-    const topY = s.topY - s.len*s.grow;
-    if(p.x+p.w>s.x-6 && p.x<s.x+6 && p.y+p.h>topY && p.y<s.topY) damagePlayer(12);
+    s.grow = Math.min(1, (s.grow||0) + dt*0.16);
+    const el=s.el||Math.PI/4, dir=s.dir||1, L=s.len*s.grow, hw=(s.width||16)/2;
+    const cx=Math.cos(el), sy=Math.sin(el);
+    for(let t=0;t<=1.001;t+=0.25){          // sample along the shaft for a hit
+      const px=s.x + dir*cx*L*t, py=s.topY - sy*L*t;
+      if(p.x+p.w>px-hw && p.x<px+hw && p.y+p.h>py-6 && p.y<s.topY){ damagePlayer(12); break; }
+    }
     if(s.life<=0) state.spikes.splice(i,1);
+  }
+}
+
+// The Dark Knight's levitate attack: swords hang in the air (telegraph) then plunge.
+export function updateSkySwords(dt){
+  const p=state.player;
+  for(let i=state.skySwords.length-1;i>=0;i--){
+    const s=state.skySwords[i];
+    if(s.telegraph>0){ s.telegraph -= dt*16.7; if(s.telegraph<=0) s.vy=6; continue; }
+    s.vy += 0.55*dt; s.y += s.vy*dt;
+    if(!s.done && p.x+p.w>s.x-7 && p.x<s.x+7 && p.y+p.h>s.y && p.y<s.y+s.len){ damagePlayer(s.dmg); s.done=true; }
+    if(s.y + s.len >= s.groundY){                       // strikes the ground
+      for(let k=0;k<9;k++) spawnParticles(s.x+ri(-5,5), s.groundY, k%2?'#7a3ab0':'#c9a0ff', 1);
+      state.skySwords.splice(i,1);
+    }
+  }
+}
+
+// The Dark Knight's black/purple fire pillars: telegraph on the ground, then a
+// tall column of dark flame that burns the player standing in it.
+export function updateDarkFire(dt){
+  const p=state.player;
+  for(let i=state.darkFire.length-1;i>=0;i--){
+    const c=state.darkFire[i];
+    if(c.telegraph>0){ c.telegraph -= dt*16.7; if(chance(0.5)) spawnParticles(c.x+ri(-8,8), c.groundY, '#6a2a9a', 1); continue; }
+    c.life -= dt*16.7;
+    c.grow = Math.min(1, (c.grow||0) + dt*0.12);
+    const topY = c.groundY - c.h*c.grow;
+    if(p.x+p.w>c.x-14 && p.x<c.x+14 && p.y+p.h>topY && p.y<c.groundY) damagePlayer(c.dmg); // invuln gates the rate
+    if(chance(0.4)) spawnParticles(c.x+ri(-10,10), c.groundY - Math.random()*c.h*c.grow, chance(0.5)?'#c060ff':'#1a0a2a', 1);
+    if(c.life<=0) state.darkFire.splice(i,1);
+  }
+}
+
+// The Dark Knight's thrown void javelin: flies at the player, trailing shadow.
+export function updateJavelins(dt){
+  const p=state.player;
+  for(let i=state.javelins.length-1;i>=0;i--){
+    const j=state.javelins[i];
+    j.life -= dt*16.7; j.x += j.vx*dt; j.y += j.vy*dt;
+    j.ang = Math.atan2(j.vy, j.vx);
+    if(chance(0.6)) spawnParticles(j.x, j.y, chance(0.5)?'#3a1050':'#7a2ab0', 1);
+    if(p.x+p.w>j.x-14 && p.x<j.x+14 && p.y+p.h>j.y-8 && p.y<j.y+12){ damagePlayer(j.dmg); state.javelins.splice(i,1); continue; }
+    const tx=Math.floor(j.x/TILE), ty=Math.floor(j.y/TILE);
+    if(j.life<=0 || tileAt(tx,ty)!==AIR){              // stuck in a wall/floor or spent
+      for(let k=0;k<12;k++) spawnParticles(j.x, j.y, chance(0.5)?'#c060ff':'#1a0a2a', 1);
+      state.javelins.splice(i,1);
+    }
   }
 }
 
@@ -221,12 +386,16 @@ export function hitBoss(dmg){
     const p=state.player, side=Math.sign((p.x+p.w/2)-(b.x+b.w/2));
     if(side !== -b.facing){ spawnParticles(b.x+b.w/2, b.y+b.h*0.4, '#dfe4ec', 2); return; } // not the back
     b.hp -= 1; b.backHits=(b.backHits||0)+1;
+    const crackCol = b.dark ? BOSS_TYPES.knight.darkColors.crack : BOSS_TYPES.knight.crack;
     const crackX = b.x + (b.facing>0 ? 4 : b.w-4);
-    for(let i=0;i<9;i++) spawnParticles(crackX, b.y+b.h*0.42, BOSS_TYPES.knight.crack, 1);
+    for(let i=0;i<9;i++) spawnParticles(crackX, b.y+b.h*0.42, crackCol, 1);
+    if(b.hp<=0){
+      if(!b.dark){ knightStartRise(b); return; }       // phase 1 done -> transform, don't die
+      defeatBoss(); return;                             // phase 2 done -> he falls for good
+    }
     b.roarTimer=2000; b.mode='roar';                    // roar + knockback for 2s
-    state.flashes.push({color:'rgba(255,120,60,0.18)', life:170});
-    msg('The Knight roars! ('+b.backHits+'/15)');
-    if(b.hp<=0) defeatBoss();
+    state.flashes.push({color: b.dark?'rgba(150,60,255,0.20)':'rgba(255,120,60,0.18)', life:170});
+    msg('The Knight roars! ('+b.backHits+'/'+b.maxhp+')');
     return;
   }
   b.hp -= dmg;
@@ -245,7 +414,7 @@ export function defeatBoss(){
   if(b.type==='knight' && b.arena){                 // unseal the gate so you can leave
     const a=b.arena; a.cleared=true; a.triggered=false;
     for(let gy=a.gateY; gy<a.gateY+a.gateH; gy++){ setTile(a.gateX,gy,AIR); setTile(a.gateX-1,gy,AIR); }
-    state.spikes.length=0;
+    state.spikes.length=0; state.skySwords.length=0; state.darkFire.length=0; state.javelins.length=0;
   }
   state.boss = null;
   state.bossDefeated = true;
@@ -278,6 +447,9 @@ function startTeleport(b, def){
 export function updateBoss(dt){
   updateArena(dt);
   updateSpikes(dt);
+  updateSkySwords(dt);
+  updateDarkFire(dt);
+  updateJavelins(dt);
   if(!state.boss){ if(state.bossCooldown>0) state.bossCooldown -= dt*16.7; return; }
   const b=state.boss, p=state.player, def=BOSS_TYPES[b.type];
   if(b.type==='knight'){ updateKnight(b, def, dt); return; }

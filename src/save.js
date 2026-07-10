@@ -100,7 +100,7 @@ export function loadGame(){
   state.bossCooldown = data.bossCooldown;
   // transient runtime arrays never persist; start empty each load
   state.mobs = []; state.projectiles = []; state.particles = [];
-  state.zaps = []; state.waves = []; state.flashes = []; state.bombs = []; state.falling = []; state.meteors = []; state.spikes = []; state.boss = null;
+  state.zaps = []; state.waves = []; state.flashes = []; state.bombs = []; state.falling = []; state.meteors = []; state.spikes = []; state.skySwords = []; state.darkFire = []; state.javelins = []; state.boss = null;
   if(state.player) state.player.stun = 0;
   state.mineHits = new Map();
   return true;

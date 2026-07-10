@@ -34,6 +34,9 @@ export const state = {
   falling:[],// live falling blocks {x,y,vy,tile} — dislodged tree wood/leaves
   meteors:[],// live meteor-shower streaks {x,y,vx,vy,strike,life}
   spikes:[], // ground spikes from the knight boss {x,topY,len,life,max}
+  skySwords:[], // Dark Knight's levitate attack: conjured swords raining down {x,y,vy,telegraph,dmg}
+  darkFire:[], // Dark Knight's black/purple fire pillars erupting from the ground {x,groundY,telegraph,life,h}
+  javelins:[], // Dark Knight's thrown void javelin {x,y,vx,vy,dmg,life}
   arenas:[], // boss arenas {x0,y0,w,h,gateX,gateY,gateH,triggered} (set from world at load)
   shopOpen:false,
   msgTimer:0,

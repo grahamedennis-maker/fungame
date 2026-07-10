@@ -439,7 +439,10 @@ export function generateWorld(W,H){
     for(let y=topY-1; y<=tunY; y++){ if(y>0&&y<H-1 && grid[y][shaftX]!==BEDROCK) grid[y][shaftX]=LADDER; } // ladder from surface
     return { x0, y0, w:AW, h:AH, gateX, gateY, gateH, tag:'knight', triggered:false, cleared:false };
   }
-  arenas.push(buildKnightArena(Math.round(W*0.5), 150));
+  // just beside the player's spawn (spawn x = W*0.25): the ladder shaft is a few
+  // tiles to the RIGHT of spawn so you land on solid ground and walk over to
+  // descend — you never spawn inside the arena or fall straight in.
+  arenas.push(buildKnightArena(Math.floor(W*0.25) + 26, 58));
 
   // ---- SKY ISLAND ----
   // A floating landmass near the top of the world with a villager shop and

@@ -18,7 +18,15 @@ export const MOB_TYPES = {
 // which mob type haunts each dungeon theme
 export const DUNGEON_MOB = { magma:'magma_imp', frost:'frost_wraith', storm:'skeleton' };
 
+function inArena(x, y){
+  const tx=x/TILE, ty=y/TILE;
+  for(const a of (world && world.arenas || [])){
+    if(tx>a.x0-2 && tx<a.x0+a.w+2 && ty>a.y0-2 && ty<a.y0+a.h+2) return true;
+  }
+  return false;
+}
 export function spawnMob(type, x, y){
+  if(inArena(x,y)) return;            // boss arenas stay clear of regular mobs
   const def = MOB_TYPES[type];
   state.mobs.push({ type, x, y, w:def.w, h:def.h, vx:0, vy:0, hp:def.hp, maxhp:def.hp,
     onGround:false, contactTimer:0, shootTimer:ri(500,1500), facing:1 });
